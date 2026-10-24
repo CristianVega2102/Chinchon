@@ -31,6 +31,19 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 .pozo{background:#2b2a14;border:1px solid #4a4420;border-radius:16px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center}
 .pozo b{font-family:var(--mono);color:var(--gold);font-size:22px}
 a.b1{text-decoration:none;text-align:center;display:block;border-radius:14px;padding:13px;font-weight:800;background:var(--gold);color:#2a2100}
+
+.gc{position:relative;flex:1;max-width:58px;aspect-ratio:5/7;border-radius:8px;background:#f4ecd8;color:#222;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;border:2px solid #d9cba6;font-size:clamp(14px,4.6vw,20px);cursor:pointer;user-select:none}
+.gc.s0{color:#9a6b00}.gc.s1{color:#b3261e}.gc.s2{color:#1f4e8c}.gc.s3{color:#2e6b34}
+.gc.jk{background:#3b2a5c;color:#f2c14e;border-color:#5a4690;font-size:10px}
+.gc.back{background:repeating-linear-gradient(45deg,#1d3a2c,#1d3a2c 6px,#24493a 6px,#24493a 12px);border-color:#2f5c48}
+.gc.sel{transform:translateY(-12px);border-color:var(--gold);box-shadow:0 0 0 2px var(--gold)}
+.gc.go{box-shadow:0 0 0 2px var(--gold)}
+.gc.nw::before{content:'';position:absolute;top:3px;right:3px;width:7px;height:7px;border-radius:50%;background:var(--gold)}
+.gc i{position:absolute;left:3px;right:3px;bottom:3px;height:4px;border-radius:2px}
+.hand{display:flex;gap:4px;justify-content:center;padding-top:14px}
+.piles{display:flex;gap:22px;justify-content:center}.piles .gc{width:64px;flex:none}
+.mcs{display:flex;flex-wrap:wrap;gap:3px}.mc{font-family:var(--mono);font-size:12px;background:#f4ecd8;color:#222;border-radius:4px;padding:2px 4px;font-weight:700}.mc.j{background:#3b2a5c;color:var(--gold)}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 </style>
 </head>
 <body>
@@ -38,7 +51,7 @@ a.b1{text-decoration:none;text-align:center;display:block;border-radius:14px;pad
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,onAuthStateChanged,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {getFirestore,doc,setDoc,onSnapshot,collection,query,where,writeBatch,serverTimestamp,arrayUnion,arrayRemove,increment} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getFirestore,doc,setDoc,onSnapshot,collection,query,where,writeBatch,runTransaction,updateDoc,serverTimestamp,arrayUnion,arrayRemove,increment} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app=initializeApp({
   apiKey:"AIzaSyCkJfAUeCfppXpnB4K6I8z5u_OmsH5AcxY",
@@ -52,13 +65,104 @@ const auth=getAuth(app),db=getFirestore(app);
 const A=document.getElementById('app');
 const fmt=n=>'$'+Math.round(n).toLocaleString('es-AR');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+/* ---------- Motor del Chinchón (cartas 0-39 = palo*10+posición, 40-41 = comodines) ---------- */
+const RK=[1,2,3,4,5,6,7,10,11,12],SU=['🟡','🏆','⚔️','🪵'],COL=['#f2c14e','#5fd08a','#6aa9ff','#e8665a'];
+const dc=n=>n>=40?{j:true,s:4,p:99,r:0}:{j:false,s:(n/10)|0,p:n%10,r:RK[n%10]};
+const pt=n=>{const c=dc(n);return c.j?25:c.r<=7?c.r:10};
+const ord=h=>h.slice().sort((a,b)=>a-b);
+const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+function okMeld(cs){const n=cs.length,nj=cs.filter(c=>!c.j);if(n<3||nj.length<2)return false;
+  if(n<=4&&nj.every(c=>c.r===nj[0].r)&&new Set(nj.map(c=>c.s)).size===nj.length)return true;
+  if(!nj.every(c=>c.s===nj[0].s))return false;
+  const p=nj.map(c=>c.p).sort((a,b)=>a-b);if(new Set(p).size!==p.length)return false;
+  const sp=p[p.length-1]-p[0]+1;return sp<=n&&n-sp<=p[0]+9-p[p.length-1]}
+function best(h){const cs=h.map(dc),n=cs.length,ms=[];
+  for(let m=7;m<(1<<n);m++){const x=[];for(let i=0;i<n;i++)if(m>>i&1)x.push(cs[i]);if(x.length>=3&&okMeld(x))ms.push(m)}
+  let bp=1e9,bs=[];(function r(i,u,ch){let p=0;for(let j=0;j<n;j++)if(!(u>>j&1))p+=pt(h[j]);if(p<bp){bp=p;bs=ch.slice()}
+    for(let k=i;k<ms.length;k++)if(!(ms[k]&u)){ch.push(ms[k]);r(k+1,u|ms[k],ch);ch.pop()}})(0,0,[]);
+  return{pts:bp,melds:bs}}
+const isChin=h=>h.length===7&&h.every(n=>n<40)&&h.every(n=>((n/10)|0)===((h[0]/10)|0))&&Math.max(...h)-Math.min(...h)===6;
+const canClose=(h,c)=>{const r=h.filter(x=>x!==c);return isChin(r)||best(r).pts<=5};
+const sig=(g,i)=>{do{i=(i+1)%g.orden.length}while(g.fuera[g.orden[i]]);return i};
+function repartir(g){const m=shuf([...Array(42).keys()]);g.manos={};
+  g.orden.forEach(u=>{g.manos[u]=g.fuera[u]?[]:ord(m.splice(0,7))});
+  g.desc=[m.pop()];g.mazo=m;g.dealer=sig(g,g.dealer);g.turno=sig(g,g.dealer);g.fase='robar';g.nuevo=-1;g.res=null}
+function cerrarMano(g,uid,chin){
+  const filas=g.orden.filter(u=>g.manos[u].length).map(u=>{const h=g.manos[u],d=best(h).pts;
+    const add=chin?0:u===uid?(d===0?-10:0):d;g.puntos[u]+=add;return{uid:u,add,mano:h,total:g.puntos[u]}});
+  g.orden.forEach(u=>{if(g.manos[u].length&&g.puntos[u]>100)g.fuera[u]=true});
+  const act=g.orden.filter(u=>!g.fuera[u]);
+  if(chin||act.length<=1){g.ganador=chin?uid:act[0];g.pagado=false}
+  g.res={cerro:uid,chin,filas};g.fase='resumen'}
+
+/* ---------- Jugadas en línea ---------- */
+async function mover(fn){
+  const ref=doc(db,'mesas',mia.id);
+  await runTransaction(db,async t=>{const s=await t.get(ref);const d=s.data(),g=d.g;const x=fn(g,d,t);t.update(ref,{g,...(x||{})})});
+}
+async function juego(a,b){
+  if(a==='sel'){sel=+b.dataset.c;return view()}
+  busy=true;err='';view();
+  const u=U.uid,m=mia,uref=doc(db,'users',u);
+  try{
+    if(a==='iniciar'){
+      const g={orden:m.uids.slice(),nombres:Object.fromEntries(m.jugadores.map(j=>[j.uid,j.name])),puntos:Object.fromEntries(m.uids.map(x=>[x,0])),fuera:{},dealer:3,ganador:'',pagado:false};
+      repartir(g);await updateDoc(doc(db,'mesas',m.id),{estado:'jugando',g});
+    }
+    if(a==='robar')await mover(g=>{if(g.orden[g.turno]!==u||g.fase!=='robar')return;
+      if(b.dataset.f==='mazo'&&!g.mazo.length){const top=g.desc.pop();g.mazo=shuf(g.desc);g.desc=[top]}
+      const c=b.dataset.f==='mazo'?g.mazo.pop():g.desc.pop();g.manos[u]=ord([...g.manos[u],c]);g.nuevo=c;g.fase='tirar'});
+    if(a==='tirar'&&sel!==null)await mover(g=>{if(g.orden[g.turno]!==u||g.fase!=='tirar'||!g.manos[u].includes(sel))return;
+      g.manos[u]=g.manos[u].filter(x=>x!==sel);g.desc.push(sel);g.turno=sig(g,g.turno);g.fase='robar';g.nuevo=-1});
+    if(a==='cerrar'&&sel!==null)await mover(g=>{if(g.orden[g.turno]!==u||g.fase!=='tirar'||!canClose(g.manos[u],sel))return;
+      g.manos[u]=g.manos[u].filter(x=>x!==sel);g.desc.push(sel);cerrarMano(g,u,isChin(g.manos[u]))});
+    if(a==='sig')await mover(g=>{if(g.fase!=='resumen'||g.ganador)return;repartir(g)});
+    if(a==='reeng')await mover((g,d,t)=>{if(!g.fuera[u]||g.ganador||me.saldo<d.entrada)return;
+      g.puntos[u]=Math.max(...g.orden.filter(x=>x!==u&&!g.fuera[x]).map(x=>g.puntos[x]));delete g.fuera[u];
+      t.update(uref,{saldo:increment(-d.entrada)});return{pozo:increment(d.entrada)}});
+    if(a==='cobrar')await mover((g,d,t)=>{if(g.ganador!==u||g.pagado)return;g.pagado=true;
+      t.update(uref,{saldo:increment(Math.floor(d.pozo*0.9)),mesaCobro:m.id})});
+    if(a==='fin')await updateDoc(doc(db,'mesas',m.id),{estado:'terminada'});
+    sel=null;busy=false;view();
+  }catch(x){fail(x)}
+}
+const gcard=(n,x='',at='')=>{const c=dc(n);return c.j?`<div class="gc jk ${x}" ${at}>🃏<span>COMODÍN</span></div>`:`<div class="gc s${c.s} ${x}" ${at}><span>${c.r}</span><span>${SU[c.s]}</span></div>`};
+const mini=n=>{const c=dc(n);return `<span class="mc ${c.j?'j':''}">${c.j?'🃏':c.r+SU[c.s]}</span>`};
+function juegoView(){
+  const m=mia,g=m.g,u=U.uid,yo=g.manos[u]||[],mi=g.orden[g.turno]===u&&g.fase!=='resumen',fuera=!!g.fuera[u];
+  const nom=x=>esc(g.nombres[x]);
+  const ops=g.orden.filter(x=>x!==u).map(x=>`<div class="seat ${g.orden[g.turno]===x&&g.fase!=='resumen'?'me':''}" style="min-height:0;padding:10px 4px;${g.fuera[x]?'opacity:.45':''}"><div class="av" style="width:40px;height:40px;font-size:16px">${esc(g.nombres[x][0].toUpperCase())}</div><b style="font-size:13px">${nom(x)}</b><span class="mono" style="font-size:13px">${g.puntos[x]} pts</span><span class="tag">${g.fuera[x]?'Eliminado':(g.manos[x]||[]).length+' cartas'}</span></div>`).join('');
+  const msg=g.fase==='resumen'?'Fin de la mano':fuera?'Estás eliminado. Podés mirar la partida.':mi?(g.fase==='robar'?'Tu turno: sacá del mazo o del descarte':'Elegí una carta para descartar o cerrar'):'Juega '+nom(g.orden[g.turno])+'…';
+  const top=g.desc[g.desc.length-1],mk={};
+  best(yo).melds.forEach((mm,k)=>{for(let i=0;i<yo.length;i++)if(mm>>i&1)mk[yo[i]]=COL[k%4]});
+  const hand=fuera?'':yo.map(n=>gcard(n,(sel===n?'sel ':'')+(g.nuevo===n?'nw':''),`data-a="sel" data-c="${n}" role="button" tabindex="0"`).replace(/<\/div>$/,mk[n]?`<i style="background:${mk[n]}"></i></div>`:'</div>')).join('');
+  let res='';
+  if(g.fase==='resumen'){
+    const R=g.res,gan=g.ganador;
+    const filas=R.filas.map(f=>`<div class="card" style="padding:10px"><div class="row"><b>${nom(f.uid)}${g.fuera[f.uid]?' · eliminado':''}</b><span class="mono" style="color:${f.add>0?'var(--bad)':'var(--ok)'}">${f.add>0?'+':''}${f.add} → ${f.total}</span></div><div class="mcs">${ord(f.mano).map(mini).join('')}</div></div>`).join('');
+    let bt='';
+    if(gan){const prize=Math.floor(m.pozo*0.9);
+      bt=`<h2>${R.chin?'¡CHINCHÓN! ':''}Ganó ${nom(gan)}</h2>`+(g.pagado?`<button class="b1" data-a="fin">Volver al lobby</button>`:gan===u?`<button class="b1" data-a="cobrar" ${busy?'disabled':''}>Cobrar ${fmt(prize)}</button><p class="note">Pozo menos 10% de comisión.</p>`:'<p class="note">Esperando que el ganador cobre el pozo.</p>');
+    }else bt=`<h2>${nom(R.cerro)} cerró la mano</h2>`+(fuera?`<button class="b2" data-a="reeng" ${busy||me.saldo<m.entrada?'disabled':''}>Reengancharse por ${fmt(m.entrada)}</button>`:'')+`<button class="b1" data-a="sig" ${busy?'disabled':''}>Siguiente mano</button>`;
+    res=`<div class="card">${bt}${filas}</div>`;
+  }
+  return `${head()}<div class="pozo"><span class="note">${esc(m.nombre)} · Entrada ${fmt(m.entrada)}</span><div style="text-align:right"><span class="note">Pozo</span><br><b>${fmt(m.pozo)}</b></div></div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">${ops}</div>
+  <div class="card"><b style="text-align:center">${msg}</b>${err?`<div class="err">${err}</div>`:''}
+    <div class="piles"><div class="gc back ${mi&&g.fase==='robar'?'go':''}" data-a="robar" data-f="mazo" role="button" tabindex="0" aria-label="Sacar del mazo"></div>${gcard(top,mi&&g.fase==='robar'?'go':'',`data-a="robar" data-f="desc" role="button" tabindex="0" aria-label="Levantar del descarte"`)}</div>
+    <div class="note" style="text-align:center">Mazo ${g.mazo.length} · Tus puntos ${g.puntos[u]}/100</div></div>
+  ${res}<div class="hand">${hand}</div>
+  <div class="acts"><button class="b2" data-a="tirar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy?'':'disabled'}>Descartar</button><button class="b1" data-a="cerrar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy&&canClose(yo,sel)?'':'disabled'}>Cerrar mano</button></div>`;
+}
+let sel=null;
+
 let U=null,me=null,mesas=[],mia=null,unsubs=[],modo='in',err='',busy=false;
 
 onAuthStateChanged(auth,u=>{
   unsubs.forEach(f=>f());unsubs=[];U=u;me=null;mesas=[];mia=null;
   if(u){
     unsubs.push(onSnapshot(doc(db,'users',u.uid),s=>{me=s.exists()?s.data():null;view()}));
-    unsubs.push(onSnapshot(query(collection(db,'mesas'),where('estado','==','esperando')),s=>{
+    unsubs.push(onSnapshot(query(collection(db,'mesas'),where('estado','in',['esperando','jugando'])),s=>{
       mesas=s.docs.map(d=>({id:d.id,...d.data()})).filter(m=>m.uids.length);
       mia=mesas.find(m=>m.uids.includes(u.uid))||null;view();
     }));
@@ -72,7 +176,7 @@ const fail=e=>{err=MSG[e.code]||MSG[(e.code||'').replace('auth/','')]||'No se pu
 function view(){
   if(!U)return A.innerHTML=authView();
   if(!me)return A.innerHTML='<p class="note">Cargando tu cuenta…</p>';
-  A.innerHTML=mia?salaView():lobbyView();
+  A.innerHTML=mia?(mia.estado==='jugando'?juegoView():salaView()):lobbyView();
 }
 function authView(){
   const reg=modo==='up';
@@ -88,7 +192,7 @@ function authView(){
 }
 function head(){return `<div class="bar"><h1>${esc(me.name)}</h1><div class="row"><span class="chip">${fmt(me.saldo)}</span><button class="b3" data-a="salir">Salir</button></div></div>`}
 function lobbyView(){
-  const list=mesas.length?mesas.map(m=>`<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="mono gold">${m.uids.length}/4</span></div>
+  const ab=mesas.filter(m=>m.estado==='esperando');const list=ab.length?ab.map(m=>`<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="mono gold">${m.uids.length}/4</span></div>
     <div class="row"><span class="note">Entrada</span><span class="mono">${fmt(m.entrada)}</span></div>
     <div class="row"><span class="note">Pozo</span><span class="mono gold">${fmt(m.pozo)}</span></div>
     <button class="b2" data-a="unirse" data-id="${m.id}" ${busy||m.uids.length>=4||me.saldo<m.entrada?'disabled':''}>${me.saldo<m.entrada?'Saldo insuficiente':m.uids.length>=4?'Mesa llena':'Sentarme'}</button></div>`).join('')
@@ -108,8 +212,8 @@ function salaView(){
   <div class="pozo"><span class="note">Entrada ${fmt(m.entrada)}</span><div style="text-align:right"><span class="note">Pozo acumulado</span><br><b>${fmt(m.pozo)}</b></div></div>
   <div class="card"><div class="row"><h2>${full?'Mesa completa':'Esperando jugadores…'}</h2><span class="mono gold">${js.length}/4</span></div></div>
   <div class="seats">${seats}</div>
-  <button class="b1" disabled>Iniciar partida</button>
-  <p class="note">El juego en línea se conecta en el próximo paso. Por ahora podés armar la mesa e invitar gente.</p>
+  <button class="b1" data-a="iniciar" ${full&&!busy?'':'disabled'}>Iniciar partida</button>
+  <p class="note">${full?'Cualquiera de los 4 puede iniciar.':'Se necesitan 4 jugadores para empezar.'}</p>${err?`<div class="err">${err}</div>`:''}
   <a class="b1" href="https://wa.me/?text=${txt}" target="_blank" rel="noopener">Invitar amigo por WhatsApp</a>
   <button class="b2" data-a="salirMesa" ${busy?'disabled':''}>Salir de la mesa (te devolvemos la entrada)</button>`;
 }
@@ -129,6 +233,7 @@ document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a;
   if(a==='modo'){modo=b.dataset.v;err='';return view()}
   if(a==='salir')return signOut(auth);
+  if(['robar','tirar','cerrar','sig','reeng','cobrar','iniciar','sel','fin'].includes(a))return juego(a,b);
   err='';busy=true;view();
   try{
     const uref=doc(db,'users',U.uid),batch=writeBatch(db);
