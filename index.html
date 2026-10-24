@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chinchón · Mesa Criolla Real</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0e1b15;--panel:#15271e;--line:#22392d;--gold:#f2c14e;--ink:#e8f0ea;--mute:#8fa597;--ok:#5fd08a;--bad:#e8665a;
+--sans:'Plus Jakarta Sans',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace}
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);min-height:100dvh;display:flex;justify-content:center}
+#app{width:100%;max-width:460px;padding:12px 12px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:8px}
+h1{font-size:17px;font-weight:800;line-height:1.2}
+.chip{font-family:var(--mono);font-weight:700;font-size:13px;background:#1d3a2c;color:var(--ok);padding:6px 10px;border-radius:999px}
+.pozo{display:flex;justify-content:space-between;align-items:center;background:#2b2a14;border:1px solid #4a4420;border-radius:16px;padding:10px 14px}
+.pozo small{color:var(--mute);font-size:12px}.pozo b{font-family:var(--mono);color:var(--gold);font-size:22px}
+.ops{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.op{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 6px;text-align:center;display:flex;flex-direction:column;gap:3px;align-items:center}
+.op.on{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
+.op.out{opacity:.45}
+.av{width:44px;height:44px;border-radius:50%;background:#24493a;display:grid;place-items:center;font-weight:800;font-size:18px}
+.op b{font-size:13px}.op .lv{font-family:var(--mono);font-size:11px;color:var(--gold)}
+.op .sc{font-family:var(--mono);font-size:13px;font-weight:700}
+.op .ct{font-size:11px;color:var(--mute)}
+.table{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:12px;align-items:center}
+#msg{font-size:14px;font-weight:700;text-align:center;min-height:20px}
+.piles{display:flex;gap:22px}
+.pile{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:var(--mute)}
+.card{position:relative;aspect-ratio:5/7;border-radius:8px;background:#f4ecd8;color:#222;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;border:2px solid #d9cba6;transition:transform .15s;user-select:none}
+.card .r{font-size:clamp(15px,4.8vw,21px);line-height:1}.card .s{font-size:clamp(13px,4vw,18px)}
+.card.s0 .r{color:#9a6b00}.card.s1 .r{color:#b3261e}.card.s2 .r{color:#1f4e8c}.card.s3 .r{color:#2e6b34}
+.card.jk{background:#3b2a5c;color:#f2c14e;border-color:#5a4690}.card.jk .r{color:#f2c14e;font-size:11px}
+.card.back{background:repeating-linear-gradient(45deg,#1d3a2c,#1d3a2c 6px,#24493a 6px,#24493a 12px);border-color:#2f5c48}
+.pile .card{width:64px}
+.pile .card.go{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold)}
+.hand{display:flex;gap:4px;justify-content:center;padding-top:14px}
+.hand .card{flex:1;max-width:58px;min-width:0;cursor:pointer}
+.hand .card.sel{transform:translateY(-12px);border-color:var(--gold);box-shadow:0 0 0 2px var(--gold)}
+.hand .card.new::before{content:'';position:absolute;top:3px;right:3px;width:7px;height:7px;border-radius:50%;background:var(--gold)}
+.hand .card i{position:absolute;left:3px;right:3px;bottom:3px;height:4px;border-radius:2px}
+.me{display:flex;justify-content:space-between;font-size:13px;color:var(--mute)}
+.me b{font-family:var(--mono);color:var(--ink)}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{font:inherit;font-weight:800;border:0;border-radius:14px;padding:14px;font-size:15px;cursor:pointer}
+button:disabled{opacity:.35;cursor:default}
+.b1{background:var(--gold);color:#2a2100}.b2{background:#1d3a2c;color:var(--ok)}
+button:focus-visible,.card:focus-visible{outline:3px solid #fff;outline-offset:2px}
+#ov{position:fixed;inset:0;background:rgba(5,12,9,.88);display:none;align-items:center;justify-content:center;padding:14px;overflow:auto}
+#ov.on{display:flex}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;width:100%;max-width:440px;display:flex;flex-direction:column;gap:12px;max-height:92dvh;overflow:auto}
+.box h2{font-size:19px}
+.row{border-top:1px solid var(--line);padding-top:8px;display:flex;flex-direction:column;gap:5px}
+.row .t{display:flex;justify-content:space-between;font-size:14px;font-weight:700}
+.row .t span{font-family:var(--mono)}
+.mcs{display:flex;flex-wrap:wrap;gap:3px}
+.mc{font-family:var(--mono);font-size:12px;background:#f4ecd8;color:#222;border-radius:4px;padding:2px 4px;font-weight:700}
+.mc.j{background:#3b2a5c;color:var(--gold)}
+.plus{color:var(--bad)}.minus{color:var(--ok)}
+.note{font-size:12px;color:var(--mute)}
+@media (prefers-reduced-motion:reduce){.card{transition:none}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="bar"><h1>Mesa #408: Mesa Criolla Real</h1><div class="chip" id="fichas"></div></div>
+  <div class="pozo"><div><small>Entrada</small><br><b style="font-size:15px" id="entrada"></b></div><div style="text-align:right"><small>Pozo acumulado</small><br><b id="pozo"></b></div></div>
+  <div class="ops" id="ops"></div>
+  <div class="table">
+    <div id="msg"></div>
+    <div class="piles">
+      <div class="pile"><div class="card back" id="deck" role="button" tabindex="0" aria-label="Sacar del mazo"></div><span id="dcount"></span></div>
+      <div class="pile"><div id="disc"></div><span>Descarte</span></div>
+    </div>
+  </div>
+  <div class="me"><span>Tus puntos: <b id="myscore"></b> / 100</span><span id="rules">Cierra con 5 puntos o menos</span></div>
+  <div class="hand" id="hand"></div>
+  <div class="acts"><button class="b2" id="bdis">Descartar</button><button class="b1" id="bclose">Cerrar mano</button></div>
+</div>
+<div id="ov"></div>
+
+<script>
+const SUITS=['🟡','🏆','⚔️','🪵'],RK=[1,2,3,4,5,6,7,10,11,12],ENTRADA=500,COM=0.10;
+const COLORS=['#f2c14e','#5fd08a','#6aa9ff','#e8665a'];
+const $=s=>document.querySelector(s),fmt=n=>'$'+Math.round(n).toLocaleString('es-AR');
+let G,bank=5000;
+
+/* ---------- Motor de reglas ---------- */
+function mkDeck(){const d=[];SUITS.forEach((_,s)=>RK.forEach((r,p)=>d.push({s,r,p,j:false})));d.push({s:4,r:0,p:99,j:true},{s:4,r:0,p:99,j:true});return d}
+function shuf(a){for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a}
+const pt=c=>c.j?25:c.r<=7?c.r:10;
+const sortHand=h=>h.sort((a,b)=>(a.s-b.s)||(a.p-b.p));
+function validMeld(cs){
+  const n=cs.length,nj=cs.filter(c=>!c.j);
+  if(n<3||nj.length<2)return false;
+  if(n<=4&&nj.every(c=>c.r===nj[0].r)&&new Set(nj.map(c=>c.s)).size===nj.length)return true;
+  if(!nj.every(c=>c.s===nj[0].s))return false;
+  const p=nj.map(c=>c.p).sort((a,b)=>a-b);
+  if(new Set(p).size!==p.length)return false;
+  const span=p[p.length-1]-p[0]+1;
+  if(span>n)return false;
+  return n-span<=p[0]+(9-p[p.length-1]);
+}
+function best(hand){
+  const n=hand.length,melds=[];
+  for(let m=7;m<(1<<n);m++){
+    const cs=[];for(let i=0;i<n;i++)if(m>>i&1)cs.push(hand[i]);
+    if(cs.length>=3&&validMeld(cs))melds.push(m);
+  }
+  let bp=Infinity,bs=[];
+  (function rec(i,used,ch){
+    let pts=0;for(let j=0;j<n;j++)if(!(used>>j&1))pts+=pt(hand[j]);
+    if(pts<bp){bp=pts;bs=ch.slice()}
+    for(let k=i;k<melds.length;k++)if(!(melds[k]&used)){ch.push(melds[k]);rec(k+1,used|melds[k],ch);ch.pop()}
+  })(0,0,[]);
+  return{pts:bp,melds:bs};
+}
+function isChin(h){
+  if(h.length!==7||h.some(c=>c.j)||!h.every(c=>c.s===h[0].s))return false;
+  const p=h.map(c=>c.p).sort((a,b)=>a-b);return p[6]-p[0]===6;
+}
+const restWithout=(h,i)=>h.filter((_,k)=>k!==i);
+const canClose=(h,i)=>{const r=restWithout(h,i);return isChin(r)||best(r).pts<=5};
+
+/* ---------- Flujo de la partida ---------- */
+function newGame(){
+  if(bank<ENTRADA)bank=5000;
+  bank-=ENTRADA;
+  const names=['Vos','Martín G.','Sofía_Tucuman','Facundo_99'],lv=[0,14,22,8];
+  G={players:names.map((name,i)=>({name,lv:lv[i],bot:i>0,hand:[],score:0,out:false,in:false})),
+     deck:[],disc:[],turn:0,phase:'draw',dealer:3,pozo:ENTRADA*4,sel:null,newCard:null,msg:'',over:false};
+  dealRound();
+}
+const nextActive=i=>{do{i=(i+1)%4}while(G.players[i].out);return i};
+function dealRound(){
+  $('#ov').classList.remove('on');
+  G.deck=shuf(mkDeck());
+  G.players.forEach(p=>{p.in=!p.out;p.hand=p.out?[]:sortHand(G.deck.splice(0,7))});
+  G.disc=[G.deck.pop()];
+  G.dealer=nextActive(G.dealer);G.turn=nextActive(G.dealer);
+  G.phase='draw';G.sel=null;G.newCard=null;
+  render();
+  if(G.players[G.turn].bot)setTimeout(botDraw,900);
+}
+function next(){
+  G.turn=nextActive(G.turn);G.phase='draw';G.sel=null;G.newCard=null;render();
+  if(G.players[G.turn].bot)setTimeout(botDraw,900);
+}
+function draw(from){
+  const p=G.players[G.turn];
+  if(from==='deck'&&!G.deck.length){const top=G.disc.pop();G.deck=shuf(G.disc);G.disc=[top]}
+  const c=from==='deck'?G.deck.pop():G.disc.pop();
+  p.hand.push(c);sortHand(p.hand);G.phase='discard';G.newCard=c;G.sel=null;
+  G.msg=p.name+(from==='deck'?' sacó del mazo':' levantó el descarte');
+}
+function doDiscard(i){
+  const p=G.players[G.turn];G.disc.push(p.hand.splice(i,1)[0]);next();
+}
+function doClose(i){
+  const p=G.players[G.turn];G.disc.push(p.hand.splice(i,1)[0]);
+  endRound(G.turn,isChin(p.hand));
+}
+function endRound(closer,chin){
+  const rows=[];
+  G.players.forEach((p,i)=>{
+    if(!p.in)return;
+    const d=best(p.hand).pts;
+    let add=i===closer?(chin?0:d===0?-10:0):d;
+    if(chin&&i!==closer)add=0;
+    p.score+=add;
+    rows.push({p,add});
+  });
+  G.players.forEach(p=>{if(p.in&&p.score>100)p.out=true});
+  const active=G.players.filter(p=>!p.out);
+  const cp=G.players[closer];
+  let head=chin?`¡CHINCHÓN! ${cp.name} gana la partida`:`${cp.name} cerró la mano`;
+  let over=chin||active.length<=1;
+  let winner=chin?cp:active[0];
+  if(over){
+    G.over=true;
+    const prize=G.pozo*(1-COM);
+    if(winner===G.players[0])bank+=prize;
+    head=`Ganó ${winner.name}`;
+  }
+  render();
+  const body=rows.map(({p,add})=>`<div class="row"><div class="t"><span style="font-family:var(--sans)">${p.name}${p.out?' · eliminado':''}</span><span class="${add>0?'plus':'minus'}">${add>0?'+':''}${add} → ${p.score}</span></div><div class="mcs">${sortHand(p.hand.slice()).map(c=>`<span class="mc ${c.j?'j':''}">${c.j?'🃏':c.r+SUITS[c.s]}</span>`).join('')}</div></div>`).join('');
+  const me=G.players[0];
+  let foot='';
+  if(over){
+    foot=`<p class="note">${winner===me?`Cobrás ${fmt(G.pozo*(1-COM))} (pozo menos ${COM*100}% de comisión).`:'El pozo se lo lleva el ganador.'} Fichas de práctica, sin valor de dinero.</p><button class="b1" onclick="newGame()">Nueva partida (${fmt(ENTRADA)})</button>`;
+  }else{
+    const rej=me.out?`<button class="b2" ${bank<ENTRADA?'disabled':''} onclick="rejoin()">Reengancharse por ${fmt(ENTRADA)}</button><p class="note">Volvés con ${Math.max(...active.map(p=>p.score))} puntos, igual que el más alto.</p>`:'';
+    foot=rej+`<button class="b1" onclick="dealRound()">Siguiente mano</button>`;
+  }
+  $('#ov').innerHTML=`<div class="box"><h2>${head}</h2>${body}${foot}</div>`;
+  $('#ov').classList.add('on');
+}
+function rejoin(){
+  const me=G.players[0];
+  me.score=Math.max(...G.players.filter(p=>!p.out).map(p=>p.score));
+  me.out=false;bank-=ENTRADA;G.pozo+=ENTRADA;
+  render();$('#ov').querySelector('.box').insertAdjacentHTML('afterbegin','<p class="note">¡Reenganchado! Entrás en la próxima mano.</p>');
+  $('#ov button.b2')?.remove();
+}
+
+/* ---------- Bots ---------- */
+function botDraw(){
+  if(G.over)return;
+  const p=G.players[G.turn],top=G.disc[G.disc.length-1],cur=best(p.hand).pts;
+  const cand=p.hand.concat(top);let take=Infinity;
+  cand.forEach((_,i)=>{take=Math.min(take,best(restWithout(cand,i)).pts)});
+  draw(take<cur?'disc':'deck');render();
+  setTimeout(botDiscard,900);
+}
+function botDiscard(){
+  if(G.over)return;
+  const p=G.players[G.turn];let bi=0,bp=1e9,bc=-1;
+  p.hand.forEach((c,i)=>{const pts=best(restWithout(p.hand,i)).pts;if(pts<bp||(pts===bp&&pt(c)>bc)){bp=pts;bi=i;bc=pt(c)}});
+  const ok=canClose(p.hand,bi);
+  if(ok&&(isChin(restWithout(p.hand,bi))||bp===0||Math.random()>.3))doClose(bi);else doDiscard(bi);
+}
+
+/* ---------- Interfaz ---------- */
+function cardEl(c,extra=''){
+  return c.j?`<div class="card jk ${extra}"><span class="s">🃏</span><span class="r">COMODÍN</span></div>`
+            :`<div class="card s${c.s} ${extra}"><span class="r">${c.r}</span><span class="s">${SUITS[c.s]}</span></div>`;
+}
+function render(){
+  const me=G.players[0];
+  $('#fichas').textContent=fmt(bank);$('#entrada').textContent=fmt(ENTRADA);$('#pozo').textContent=fmt(G.pozo);
+  $('#ops').innerHTML=G.players.slice(1).map((p,k)=>{const i=k+1;
+    return`<div class="op ${G.turn===i&&!G.over?'on':''} ${p.out?'out':''}"><div class="av">${p.name[0]}</div><b>${p.name}</b><span class="lv">Nvl ${p.lv}</span><span class="sc">${p.score} pts</span><span class="ct">${p.out?'Eliminado':p.hand.length+' cartas'}</span></div>`}).join('');
+  $('#dcount').textContent='Mazo · '+G.deck.length;
+  const top=G.disc[G.disc.length-1];
+  $('#disc').innerHTML=top?`<div class="pile" style="gap:0" id="dtop" role="button" tabindex="0" aria-label="Levantar del descarte">${cardEl(top,G.turn===0&&G.phase==='draw'&&!G.over?'go':'')}</div>`:'';
+  $('#deck').classList.toggle('go',G.turn===0&&G.phase==='draw'&&!G.over);
+  $('#myscore').textContent=me.score;
+  const myTurn=G.turn===0&&!G.over&&!me.out;
+  $('#msg').textContent=G.over?'Partida terminada':me.out&&G.turn===0?'':myTurn?(G.phase==='draw'?'Tu turno: sacá del mazo o del descarte':'Elegí una carta para descartar o cerrar'):'Juega '+G.players[G.turn].name+'…';
+  const b=best(me.hand),mark={};
+  b.melds.forEach((m,k)=>{for(let i=0;i<me.hand.length;i++)if(m>>i&1)mark[i]=COLORS[k%4]});
+  $('#hand').innerHTML=me.out?'<p class="note">Estás eliminado. Podés reengancharte al terminar la mano.</p>':me.hand.map((c,i)=>cardEl(c,(G.sel===i?'sel ':'')+(c===G.newCard?'new ':'')).replace(/^<div class="card/,`<div data-i="${i}" tabindex="0" role="button" class="card`).replace(/<\/div>$/,(mark[i]?`<i style="background:${mark[i]}"></i>`:'')+'</div>')).join('');
+  const sel=G.sel!==null&&myTurn&&G.phase==='discard';
+  $('#bdis').disabled=!sel;
+  $('#bclose').disabled=!(sel&&canClose(me.hand,G.sel));
+}
+$('#deck').onclick=()=>{if(G.turn===0&&G.phase==='draw'&&!G.over&&!G.players[0].out){draw('deck');render()}};
+$('#disc').onclick=()=>{if(G.turn===0&&G.phase==='draw'&&!G.over&&!G.players[0].out){draw('disc');render()}};
+$('#hand').onclick=e=>{const c=e.target.closest('[data-i]');if(!c||G.turn!==0||G.phase!=='discard')return;G.sel=+c.dataset.i;render()};
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.getAttribute('role')==='button'){e.preventDefault();e.target.click()}});
+$('#bdis').onclick=()=>{if(G.sel!==null)doDiscard(G.sel)};
+$('#bclose').onclick=()=>{if(G.sel!==null&&canClose(G.players[0].hand,G.sel))doClose(G.sel)};
+newGame();
+</script>
+</body>
+</html>
