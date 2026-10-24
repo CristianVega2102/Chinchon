@@ -121,7 +121,7 @@ async function juego(a,b){
       g.puntos[u]=Math.max(...g.orden.filter(x=>x!==u&&!g.fuera[x]).map(x=>g.puntos[x]));delete g.fuera[u];
       t.update(uref,{saldo:increment(-d.entrada)});return{pozo:increment(d.entrada)}});
     if(a==='cobrar')await mover((g,d,t)=>{if(g.ganador!==u||g.pagado)return;g.pagado=true;
-      t.update(uref,{saldo:increment(Math.floor(d.pozo*0.9)),mesaCobro:m.id})});
+      t.update(uref,{saldo:increment(Math.floor(d.pozo*(100-cfg.comision)/100)),mesaCobro:m.id})});
     if(a==='fin')await updateDoc(doc(db,'mesas',m.id),{estado:'terminada'});
     sel=null;busy=false;view();
   }catch(x){fail(x)}
@@ -141,8 +141,8 @@ function juegoView(){
     const R=g.res,gan=g.ganador;
     const filas=R.filas.map(f=>`<div class="card" style="padding:10px"><div class="row"><b>${nom(f.uid)}${g.fuera[f.uid]?' · eliminado':''}</b><span class="mono" style="color:${f.add>0?'var(--bad)':'var(--ok)'}">${f.add>0?'+':''}${f.add} → ${f.total}</span></div><div class="mcs">${ord(f.mano).map(mini).join('')}</div></div>`).join('');
     let bt='';
-    if(gan){const prize=Math.floor(m.pozo*0.9);
-      bt=`<h2>${R.chin?'¡CHINCHÓN! ':''}Ganó ${nom(gan)}</h2>`+(g.pagado?`<button class="b1" data-a="fin">Volver al lobby</button>`:gan===u?`<button class="b1" data-a="cobrar" ${busy?'disabled':''}>Cobrar ${fmt(prize)}</button><p class="note">Pozo menos 10% de comisión.</p>`:'<p class="note">Esperando que el ganador cobre el pozo.</p>');
+    if(gan){const prize=Math.floor(m.pozo*(100-cfg.comision)/100);
+      bt=`<h2>${R.chin?'¡CHINCHÓN! ':''}Ganó ${nom(gan)}</h2>`+(g.pagado?`<button class="b1" data-a="fin">Volver al lobby</button>`:gan===u?`<button class="b1" data-a="cobrar" ${busy?'disabled':''}>Cobrar ${fmt(prize)}</button><p class="note">Pozo menos ${cfg.comision}% de comisión.</p>`:'<p class="note">Esperando que el ganador cobre el pozo.</p>');
     }else bt=`<h2>${nom(R.cerro)} cerró la mano</h2>`+(fuera?`<button class="b2" data-a="reeng" ${busy||me.saldo<m.entrada?'disabled':''}>Reengancharse por ${fmt(m.entrada)}</button>`:'')+`<button class="b1" data-a="sig" ${busy?'disabled':''}>Siguiente mano</button>`;
     res=`<div class="card">${bt}${filas}</div>`;
   }
@@ -154,13 +154,14 @@ function juegoView(){
   ${res}<div class="hand">${hand}</div>
   <div class="acts"><button class="b2" data-a="tirar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy?'':'disabled'}>Descartar</button><button class="b1" data-a="cerrar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy&&canClose(yo,sel)?'':'disabled'}>Cerrar mano</button></div>`;
 }
-let sel=null;
+let sel=null;let cfg={comision:10,entradas:[500,1000,2000],whatsapp:''};
 
 let U=null,me=null,mesas=[],mia=null,unsubs=[],modo='in',err='',busy=false;
 
 onAuthStateChanged(auth,u=>{
   unsubs.forEach(f=>f());unsubs=[];U=u;me=null;mesas=[];mia=null;
   if(u){
+    unsubs.push(onSnapshot(doc(db,'config','general'),s=>{if(s.exists())cfg={...cfg,...s.data()};view()}));
     unsubs.push(onSnapshot(doc(db,'users',u.uid),s=>{me=s.exists()?s.data():null;view()}));
     unsubs.push(onSnapshot(query(collection(db,'mesas'),where('estado','in',['esperando','jugando'])),s=>{
       mesas=s.docs.map(d=>({id:d.id,...d.data()})).filter(m=>m.uids.length);
@@ -197,8 +198,9 @@ function lobbyView(){
     <div class="row"><span class="note">Pozo</span><span class="mono gold">${fmt(m.pozo)}</span></div>
     <button class="b2" data-a="unirse" data-id="${m.id}" ${busy||m.uids.length>=4||me.saldo<m.entrada?'disabled':''}>${me.saldo<m.entrada?'Saldo insuficiente':m.uids.length>=4?'Mesa llena':'Sentarme'}</button></div>`).join('')
     :'<p class="note">No hay mesas abiertas. Creá la primera.</p>';
-  return `${head()}
-  <div class="card"><h2>Crear mesa</h2><select id="ent" aria-label="Entrada"><option value="500">Entrada $500</option><option value="1000">Entrada $1.000</option><option value="2000">Entrada $2.000</option></select>
+  const wa=cfg.whatsapp?`<a class="b1" target="_blank" rel="noopener" href="https://wa.me/${cfg.whatsapp}?text=${encodeURIComponent('Hola, quiero cargar fichas. Mi usuario: '+me.name+' (código '+U.uid.slice(0,6)+')')}">Cargar saldo por WhatsApp</a>`:'';
+  return `${head()}${wa}${me.admin?'<a class="b2" style="text-align:center;text-decoration:none;border-radius:14px;padding:13px;font-weight:800" href="admin.html">Panel de administrador</a>':''}
+  <div class="card"><h2>Crear mesa</h2><select id="ent" aria-label="Entrada">${cfg.entradas.map(n=>`<option value="${n}">Entrada ${fmt(n)}</option>`).join('')}</select>
   ${err?`<div class="err">${err}</div>`:''}<button class="b1" data-a="crear" ${busy?'disabled':''}>Crear y sentarme</button></div>
   <h2>Mesas abiertas</h2>${list}`;
 }

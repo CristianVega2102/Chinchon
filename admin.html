@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chinchón · Administrador</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0e1b15;--panel:#15271e;--line:#22392d;--gold:#f2c14e;--ink:#e8f0ea;--mute:#8fa597;--ok:#5fd08a;--bad:#e8665a;--sans:'Plus Jakarta Sans',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);min-height:100dvh;display:flex;justify-content:center}
+#app{width:100%;max-width:520px;padding:14px 14px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px}
+h1{font-size:20px;font-weight:800}h2{font-size:16px;font-weight:800}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+label{font-size:13px;color:var(--mute);display:flex;flex-direction:column;gap:5px}
+input{font:inherit;width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:#0e1b15;color:var(--ink)}
+button{font:inherit;font-weight:800;border:0;border-radius:12px;padding:12px;font-size:14px;cursor:pointer}
+button:disabled{opacity:.4}
+.b1{background:var(--gold);color:#2a2100}.b2{background:#1d3a2c;color:var(--ok)}.b3{background:none;color:var(--mute)}
+button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.mono{font-family:var(--mono);font-weight:700}.gold{color:var(--gold)}.note{color:var(--mute);font-size:12px}
+.err{color:var(--bad);font-size:13px;font-weight:700}.okm{color:var(--ok);font-size:13px;font-weight:700}
+.u{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:8px}
+.mv{display:flex;justify-content:space-between;font-size:13px;gap:8px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,doc,onSnapshot,collection,query,orderBy,limit,setDoc,writeBatch,increment,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const app=initializeApp({
+  apiKey:"AIzaSyCkJfAUeCfppXpnB4K6I8z5u_OmsH5AcxY",
+  authDomain:"chinchon-mesa.firebaseapp.com",
+  projectId:"chinchon-mesa",
+  storageBucket:"chinchon-mesa.firebasestorage.app",
+  messagingSenderId:"973919776041",
+  appId:"1:973919776041:web:b3fbf3e89b1d48c46c9b38"
+});
+const auth=getAuth(app),db=getFirestore(app),A=document.getElementById('app');
+const fmt=n=>'$'+Math.round(n).toLocaleString('es-AR');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let U=null,me=null,cfg={comision:10,entradas:[500,1000,2000],whatsapp:''},us=[],mv=[],q='',err='',ok='',unsubs=[];
+
+onAuthStateChanged(auth,u=>{
+  unsubs.forEach(f=>f());unsubs=[];U=u;me=null;us=[];mv=[];
+  if(u){
+    unsubs.push(onSnapshot(doc(db,'users',u.uid),s=>{
+      const was=me&&me.admin;me=s.exists()?s.data():null;
+      if(me&&me.admin&&!was){
+        unsubs.push(onSnapshot(collection(db,'users'),s=>{us=s.docs.map(d=>({id:d.id,...d.data()}));lista()}));
+        unsubs.push(onSnapshot(query(collection(db,'movimientos'),orderBy('creado','desc'),limit(15)),s=>{mv=s.docs.map(d=>d.data());hist()}));
+        unsubs.push(onSnapshot(doc(db,'config','general'),s=>{if(s.exists())cfg={...cfg,...s.data()};view()}));
+      }
+      view();
+    }));
+  }
+  view();
+});
+
+function view(){
+  if(!U)return A.innerHTML=`<h1>Administrador</h1><form class="card" id="f"><input name="email" type="email" placeholder="Correo" required><input name="pass" type="password" placeholder="Contraseña" required>${err?`<div class="err">${err}</div>`:''}<button class="b1">Entrar</button></form>`;
+  if(!me)return A.innerHTML='<p class="note">Cargando…</p>';
+  if(!me.admin)return A.innerHTML=`<h1>Sin permiso</h1><p class="note">Esta cuenta no es de administrador.</p><button class="b2" data-a="salir">Salir</button>`;
+  A.innerHTML=`<div class="row"><h1>Administrador</h1><button class="b3" data-a="salir">Salir</button></div>
+  <form class="card" id="cf"><h2>Configuración</h2>
+    <label>Comisión de la casa (%, de 0 a 50)<input name="com" type="number" min="0" max="50" step="1" value="${cfg.comision}"></label>
+    <label>Entradas permitidas (separadas por coma)<input name="ent" value="${cfg.entradas.join(', ')}"></label>
+    <label>WhatsApp para cargas (solo números, con código de país. Ej: 5493815551234)<input name="wa" inputmode="numeric" value="${esc(cfg.whatsapp||'')}"></label>
+    ${err?`<div class="err">${err}</div>`:''}${ok?`<div class="okm">${ok}</div>`:''}
+    <button class="b1">Guardar configuración</button></form>
+  <div class="card"><h2>Cargar saldo</h2><input id="q" placeholder="Buscar por nombre o código" value="${esc(q)}" aria-label="Buscar jugador"><div id="lista"></div></div>
+  <div class="card"><h2>Últimos movimientos</h2><div id="hist"></div></div>`;
+  lista();hist();
+}
+function lista(){
+  const el=document.getElementById('lista');if(!el)return;
+  const t=q.trim().toLowerCase();
+  const l=us.filter(u=>!t||(u.name||'').toLowerCase().includes(t)||u.id.slice(0,6).toLowerCase().includes(t)).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  el.innerHTML=l.length?l.map(u=>`<div class="u"><div class="row"><b>${esc(u.name||'?')}</b><span class="mono gold">${fmt(u.saldo||0)}</span></div><span class="note">Código ${u.id.slice(0,6)}</span>
+    <div class="row"><input id="m-${u.id}" type="number" min="1" step="1" placeholder="Monto" aria-label="Monto para ${esc(u.name||'')}"><button class="b1" data-a="cred" data-u="${u.id}">Acreditar</button><button class="b2" data-a="deb" data-u="${u.id}">Debitar</button></div></div>`).join(''):'<p class="note">No hay jugadores con ese dato.</p>';
+}
+function hist(){
+  const el=document.getElementById('hist');if(!el)return;
+  el.innerHTML=mv.length?mv.map(m=>`<div class="mv"><span>${esc(m.nombre)}</span><span class="mono" style="color:${m.monto>0?'var(--ok)':'var(--bad)'}">${m.monto>0?'+':''}${fmt(m.monto)}</span><span class="note">${m.creado?m.creado.toDate().toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'}):''}</span></div>`).join(''):'<p class="note">Todavía no hay movimientos.</p>';
+}
+document.addEventListener('input',e=>{if(e.target.id==='q'){q=e.target.value;lista()}});
+document.addEventListener('submit',async e=>{
+  e.preventDefault();const f=new FormData(e.target);err='';ok='';
+  try{
+    if(e.target.id==='f')await signInWithEmailAndPassword(auth,f.get('email'),f.get('pass'));
+    if(e.target.id==='cf'){
+      const comision=Math.floor(+f.get('com')),entradas=[...new Set(String(f.get('ent')).split(',').map(x=>Math.floor(+x.trim())).filter(n=>n>0))].slice(0,6);
+      if(!(comision>=0&&comision<=50)||!entradas.length){err='Revisá la comisión (0 a 50) y las entradas.';return view()}
+      await setDoc(doc(db,'config','general'),{comision,entradas,whatsapp:String(f.get('wa')).replace(/\D/g,'')});
+      ok='Configuración guardada.';view();
+    }
+  }catch(x){err=x.code==='auth/invalid-credential'?'Correo o contraseña incorrectos.':'No se pudo completar. Probá de nuevo.';view()}
+});
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a;
+  if(a==='salir')return signOut(auth);
+  const id=b.dataset.u,n=Math.floor(+document.getElementById('m-'+id).value);
+  if(!(n>0))return;
+  const u=us.find(x=>x.id===id),sg=a==='cred'?1:-1;
+  if(sg<0&&n>(u.saldo||0)){alert('El jugador no tiene tanto saldo.');return}
+  if(!confirm(`${sg>0?'Acreditar':'Debitar'} ${fmt(n)} a ${u.name}?`))return;
+  b.disabled=true;
+  try{
+    const w=writeBatch(db);
+    w.update(doc(db,'users',id),{saldo:increment(sg*n)});
+    w.set(doc(collection(db,'movimientos')),{uid:id,nombre:u.name,monto:sg*n,por:me.name,creado:serverTimestamp()});
+    await w.commit();
+  }catch(x){alert('No se pudo guardar el movimiento.')}
+  b.disabled=false;
+});
+</script>
+</body>
+</html>
