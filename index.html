@@ -82,7 +82,7 @@ button:focus-visible,.card:focus-visible{outline:3px solid #fff;outline-offset:2
 <div id="ov"></div>
 
 <script>
-const SUITS=['🟡','🏆','⚔️','🪵'],RK=[1,2,3,4,5,6,7,10,11,12],ENTRADA=500,COM=0.10;
+const SUITS=['🟡','🏆','⚔️','🪵'],RK=[1,2,3,4,5,6,7,8,9,10,11,12],ENTRADA=500,COM=0.10;
 const COLORS=['#f2c14e','#5fd08a','#6aa9ff','#e8665a'];
 const $=s=>document.querySelector(s),fmt=n=>'$'+Math.round(n).toLocaleString('es-AR');
 let G,bank=5000;
@@ -90,7 +90,7 @@ let G,bank=5000;
 /* ---------- Motor de reglas ---------- */
 function mkDeck(){const d=[];SUITS.forEach((_,s)=>RK.forEach((r,p)=>d.push({s,r,p,j:false})));d.push({s:4,r:0,p:99,j:true},{s:4,r:0,p:99,j:true});return d}
 function shuf(a){for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a}
-const pt=c=>c.j?25:c.r<=7?c.r:10;
+const pt=c=>c.j?25:c.r<=9?c.r:10;
 const sortHand=h=>h.sort((a,b)=>(a.s-b.s)||(a.p-b.p));
 function validMeld(cs){
   const n=cs.length,nj=cs.filter(c=>!c.j);
@@ -101,7 +101,7 @@ function validMeld(cs){
   if(new Set(p).size!==p.length)return false;
   const span=p[p.length-1]-p[0]+1;
   if(span>n)return false;
-  return n-span<=p[0]+(9-p[p.length-1]);
+  return n-span<=p[0]+(11-p[p.length-1]);
 }
 function best(hand){
   const n=hand.length,melds=[];

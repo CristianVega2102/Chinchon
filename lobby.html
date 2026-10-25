@@ -68,25 +68,25 @@ const A=document.getElementById('app');
 const fmt=n=>'$'+Math.round(n).toLocaleString('es-AR');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 /* ---------- Motor del Chinchón (cartas 0-39 = palo*10+posición, 40-41 = comodines) ---------- */
-const RK=[1,2,3,4,5,6,7,10,11,12],SU=['🟡','🏆','⚔️','🪵'],COL=['#f2c14e','#5fd08a','#6aa9ff','#e8665a'];
-const dc=n=>n>=40?{j:true,s:4,p:99,r:0}:{j:false,s:(n/10)|0,p:n%10,r:RK[n%10]};
-const pt=n=>{const c=dc(n);return c.j?25:c.r<=7?c.r:10};
+const RK=[1,2,3,4,5,6,7,8,9,10,11,12],SU=['🟡','🏆','⚔️','🪵'],COL=['#f2c14e','#5fd08a','#6aa9ff','#e8665a'];
+const dc=n=>n>=48?{j:true,s:4,p:99,r:0}:{j:false,s:(n/12)|0,p:n%12,r:RK[n%12]};
+const pt=n=>{const c=dc(n);return c.j?25:c.r<=9?c.r:10};
 const ord=h=>h.slice().sort((a,b)=>a-b);
 const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
 function okMeld(cs){const n=cs.length,nj=cs.filter(c=>!c.j);if(n<3||nj.length<2)return false;
   if(n<=4&&nj.every(c=>c.r===nj[0].r)&&new Set(nj.map(c=>c.s)).size===nj.length)return true;
   if(!nj.every(c=>c.s===nj[0].s))return false;
   const p=nj.map(c=>c.p).sort((a,b)=>a-b);if(new Set(p).size!==p.length)return false;
-  const sp=p[p.length-1]-p[0]+1;return sp<=n&&n-sp<=p[0]+9-p[p.length-1]}
+  const sp=p[p.length-1]-p[0]+1;return sp<=n&&n-sp<=p[0]+11-p[p.length-1]}
 function best(h){const cs=h.map(dc),n=cs.length,ms=[];
   for(let m=7;m<(1<<n);m++){const x=[];for(let i=0;i<n;i++)if(m>>i&1)x.push(cs[i]);if(x.length>=3&&okMeld(x))ms.push(m)}
   let bp=1e9,bs=[];(function r(i,u,ch){let p=0;for(let j=0;j<n;j++)if(!(u>>j&1))p+=pt(h[j]);if(p<bp){bp=p;bs=ch.slice()}
     for(let k=i;k<ms.length;k++)if(!(ms[k]&u)){ch.push(ms[k]);r(k+1,u|ms[k],ch);ch.pop()}})(0,0,[]);
   return{pts:bp,melds:bs}}
-const isChin=h=>h.length===7&&h.every(n=>n<40)&&h.every(n=>((n/10)|0)===((h[0]/10)|0))&&Math.max(...h)-Math.min(...h)===6;
+const isChin=h=>h.length===7&&h.every(n=>n<48)&&h.every(n=>((n/12)|0)===((h[0]/12)|0))&&Math.max(...h)-Math.min(...h)===6;
 const canClose=(h,c)=>{const r=h.filter(x=>x!==c);return isChin(r)||best(r).pts<=5};
 const sig=(g,i)=>{do{i=(i+1)%g.orden.length}while(g.fuera[g.orden[i]]);return i};
-function repartir(g){const m=shuf([...Array(42).keys()]);g.manos={};
+function repartir(g){const m=shuf([...Array(50).keys()]);g.manos={};
   g.orden.forEach(u=>{g.manos[u]=g.fuera[u]?[]:ord(m.splice(0,7))});
   g.desc=[m.pop()];g.mazo=m;g.dealer=sig(g,g.dealer);g.turno=sig(g,g.dealer);g.fase='robar';g.nuevo=-1;g.res=null;g.listosR={};g.vence=Date.now()+(g.seg||20)*1000}
 function cerrarMano(g,uid,chin){
@@ -95,25 +95,25 @@ function cerrarMano(g,uid,chin){
   g.orden.forEach(u=>{if(g.manos[u].length&&g.puntos[u]>g.limite)g.fuera[u]=true});
   const act=g.orden.filter(u=>!g.fuera[u]);
   if(chin||act.length<=1){g.ganador=chin?uid:act[0];g.pagado=false}
-  g.res={cerro:uid,chin,filas};g.fase='resumen';g.venceR=g.ganador?0:Date.now()+ESPERA*1000}
+  g.res={cerro:uid,chin,filas};g.fase='resumen';g.venceR=g.ganador?0:Date.now()+(g.esp||ESPERA)*1000}
 
 const ESPERA=40;
 function ordenar(h){const s=ord(h),b=best(s),usado=new Set(),out=[],col={};
   b.melds.forEach((m,k)=>{const gr=[];for(let i=0;i<s.length;i++)if(m>>i&1){gr.push(s[i]);usado.add(i)}
-    gr.sort((x,y)=>(x>=40)-(y>=40)||x-y).forEach(c=>{col[c]=COL[k%4];out.push(c)})});
+    gr.sort((x,y)=>(x>=48)-(y>=48)||x-y).forEach(c=>{col[c]=COL[k%4];out.push(c)})});
   s.forEach((c,i)=>{if(!usado.has(i))out.push(c)});return{cartas:out,col}}
 function desglose(mano){const s=ord(mano),b=best(s),usado=new Set();
-  const grupos=b.melds.map(m=>{const gr=[];for(let i=0;i<s.length;i++)if(m>>i&1){gr.push(s[i]);usado.add(i)}return gr.sort((x,y)=>(x>=40)-(y>=40)||x-y)});
+  const grupos=b.melds.map(m=>{const gr=[];for(let i=0;i<s.length;i++)if(m>>i&1){gr.push(s[i]);usado.add(i)}return gr.sort((x,y)=>(x>=48)-(y>=48)||x-y)});
   return{grupos,sueltas:s.filter((_,i)=>!usado.has(i)),pts:b.pts}}
 function vencioListo(g){
   const act=g.orden.filter(x=>!g.fuera[x]),lis=act.filter(x=>g.listosR[x]);
-  if(!lis.length){g.venceR=Date.now()+ESPERA*1000;return}
+  if(!lis.length){g.venceR=Date.now()+(g.esp||ESPERA)*1000;return}
   const tarde=act.filter(x=>!g.listosR[x]);
   tarde.forEach(x=>{g.fuera[x]=true;g.manos[x]=[]});
   g.res=g.res||{cerro:'',chin:false,filas:[]};
   if(lis.length<=1){g.ganador=lis[0];g.pagado=false;g.res.motivo='tiempo';g.res.quien=tarde}else repartir(g);
 }
-function armarG(d){const g={orden:d.uids.slice(),nombres:Object.fromEntries(d.jugadores.map(j=>[j.uid,j.name])),puntos:Object.fromEntries(d.uids.map(x=>[x,0])),fuera:{},limite:d.limite||100,seg:cfg.turno||20,dealer:d.max-1,ganador:'',pagado:false};repartir(g);return g}
+function armarG(d){const g={orden:d.uids.slice(),nombres:Object.fromEntries(d.jugadores.map(j=>[j.uid,j.name])),puntos:Object.fromEntries(d.uids.map(x=>[x,0])),fuera:{},limite:d.limite||100,seg:cfg.turno||20,esp:cfg.espera||ESPERA,dealer:d.max-1,ganador:'',pagado:false};repartir(g);return g}
 function autoJugar(g){
   const u=g.orden[g.turno];let h=g.manos[u];
   if(g.fase==='robar'){if(!g.mazo.length){const t=g.desc.pop();g.mazo=shuf(g.desc);g.desc=[t]}h=ord([...h,g.mazo.pop()])}
@@ -218,7 +218,7 @@ function juegoView(){
   <div class="acts"><button class="b2" data-a="tirar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy?'':'disabled'}>Descartar</button><button class="b1" data-a="cerrar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy&&canClose(yo,sel)?'':'disabled'}>Cerrar mano</button></div>
   ${g.ganador||fuera?'':'<button class="b3" data-a="aband">Abandonar partida</button>'}`;
 }
-let sel=null;const pref={ent:'',max:'4',lim:'100'};let cfg={comision:10,entradas:[500,1000,2000],turno:20,whatsapp:''};
+let sel=null;const pref={ent:'',max:'4',lim:'100'};let cfg={comision:10,entradas:[500,1000,2000],turno:20,espera:40,whatsapp:''};
 
 let U=null,me=null,mesas=[],mia=null,unsubs=[],modo='in',err='',busy=false;
 
