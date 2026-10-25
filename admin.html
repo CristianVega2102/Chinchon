@@ -43,7 +43,7 @@ const app=initializeApp({
 const auth=getAuth(app),db=getFirestore(app),A=document.getElementById('app');
 const fmt=n=>'$'+Math.round(n).toLocaleString('es-AR');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let U=null,me=null,cfg={comision:10,entradas:[500,1000,2000],turno:20,espera:40,whatsapp:''},us=[],mv=[],q='',err='',ok='',unsubs=[];
+let U=null,me=null,cfg={comision:10,entradas:[500,1000,2000],turno:20,espera:40,reenganche:0,whatsapp:''},us=[],mv=[],q='',err='',ok='',unsubs=[];
 
 onAuthStateChanged(auth,u=>{
   unsubs.forEach(f=>f());unsubs=[];U=u;me=null;us=[];mv=[];
@@ -70,6 +70,7 @@ function view(){
     <label>Comisión de la casa (%, de 0 a 50)<input name="com" type="number" min="0" max="50" step="1" value="${cfg.comision}"></label>
     <label>Segundos por turno (10 a 120)<input name="tur" type="number" min="10" max="120" step="1" value="${cfg.turno||20}"></label>
     <label>Segundos de espera entre manos (10 a 120)<input name="esp" type="number" min="10" max="120" step="1" value="${cfg.espera||40}"></label>
+    <label>Costo del reenganche (0 = igual a la entrada de cada mesa)<input name="ree" type="number" min="0" max="100000" step="1" value="${cfg.reenganche||0}"></label>
     <label>Entradas permitidas (separadas por coma)<input name="ent" value="${cfg.entradas.join(', ')}"></label>
     <label>WhatsApp para cargas (solo números, con código de país. Ej: 5493815551234)<input name="wa" inputmode="numeric" value="${esc(cfg.whatsapp||'')}"></label>
     ${err?`<div class="err">${err}</div>`:''}${ok?`<div class="okm">${ok}</div>`:''}
@@ -97,9 +98,9 @@ document.addEventListener('submit',async e=>{
     if(e.target.id==='f')await signInWithEmailAndPassword(auth,f.get('email'),f.get('pass'));
     if(e.target.id==='cf'){
       const comision=Math.floor(+f.get('com')),entradas=[...new Set(String(f.get('ent')).split(',').map(x=>Math.floor(+x.trim())).filter(n=>n>0))].slice(0,6);
-      const turno=Math.floor(+f.get('tur')),espera=Math.floor(+f.get('esp'));
-      if(!(comision>=0&&comision<=50)||!entradas.length||!(turno>=10&&turno<=120)||!(espera>=10&&espera<=120)){err='Revisá la comisión (0 a 50), los segundos de turno y de espera (10 a 120) y las entradas.';return view()}
-      await setDoc(doc(db,'config','general'),{comision,entradas,turno,espera,whatsapp:String(f.get('wa')).replace(/\D/g,'')});
+      const turno=Math.floor(+f.get('tur')),espera=Math.floor(+f.get('esp')),reenganche=Math.floor(+f.get('ree'));
+      if(!(comision>=0&&comision<=50)||!entradas.length||!(turno>=10&&turno<=120)||!(espera>=10&&espera<=120)||!(reenganche>=0&&reenganche<=100000)){err='Revisá la comisión (0 a 50), los segundos de turno y de espera (10 a 120), el reenganche y las entradas.';return view()}
+      await setDoc(doc(db,'config','general'),{comision,entradas,turno,espera,reenganche,whatsapp:String(f.get('wa')).replace(/\D/g,'')});
       ok='Configuración guardada.';view();
     }
   }catch(x){err=x.code==='auth/invalid-credential'?'Correo o contraseña incorrectos.':'No se pudo completar. Probá de nuevo.';view()}

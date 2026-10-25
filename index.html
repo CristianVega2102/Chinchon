@@ -75,7 +75,7 @@ button:focus-visible,.card:focus-visible{outline:3px solid #fff;outline-offset:2
       <div class="pile"><div id="disc"></div><span>Descarte</span></div>
     </div>
   </div>
-  <div class="me"><span>Tus puntos: <b id="myscore"></b> / 100</span><span id="rules">Cierra con 5 puntos o menos</span></div>
+  <div class="me"><span>Tus puntos: <b id="myscore"></b> / 100</span><span id="rules">Cierra con 3 puntos o menos</span></div>
   <div class="hand" id="hand"></div>
   <div class="acts"><button class="b2" id="bdis">Descartar</button><button class="b1" id="bclose">Cerrar mano</button></div>
 </div>
@@ -122,7 +122,7 @@ function isChin(h){
   const p=h.map(c=>c.p).sort((a,b)=>a-b);return p[6]-p[0]===6;
 }
 const restWithout=(h,i)=>h.filter((_,k)=>k!==i);
-const canClose=(h,i)=>{const r=restWithout(h,i);return isChin(r)||best(r).pts<=5};
+const canClose=(h,i)=>{const r=restWithout(h,i);return isChin(r)||best(r).pts<=3};
 
 /* ---------- Flujo de la partida ---------- */
 function newGame(){
@@ -224,7 +224,7 @@ function botDiscard(){
 
 /* ---------- Interfaz ---------- */
 function cardEl(c,extra=''){
-  return c.j?`<div class="card jk ${extra}"><span class="s">🃏</span><span class="r">COMODÍN</span></div>`
+  return c.j?`<div class="card jk ${extra}"><span class="s">🃏</span><span class="r">JOKER</span></div>`
             :`<div class="card s${c.s} ${extra}"><span class="r">${c.r}</span><span class="s">${SUITS[c.s]}</span></div>`;
 }
 function render(){
