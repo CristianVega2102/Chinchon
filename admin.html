@@ -30,7 +30,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:2
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {getFirestore,doc,onSnapshot,collection,query,orderBy,limit,setDoc,writeBatch,increment,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getFirestore,doc,onSnapshot,collection,query,orderBy,limit,setDoc,updateDoc,writeBatch,increment,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app=initializeApp({
   apiKey:"AIzaSyCkJfAUeCfppXpnB4K6I8z5u_OmsH5AcxY",
@@ -74,7 +74,7 @@ function view(){
     <label>WhatsApp para cargas (solo números, con código de país. Ej: 5493815551234)<input name="wa" inputmode="numeric" value="${esc(cfg.whatsapp||'')}"></label>
     ${err?`<div class="err">${err}</div>`:''}${ok?`<div class="okm">${ok}</div>`:''}
     <button class="b1">Guardar configuración</button></form>
-  <div class="card"><h2>Cargar saldo</h2><input id="q" placeholder="Buscar por nombre o código" value="${esc(q)}" aria-label="Buscar jugador"><div id="lista"></div></div>
+  <div class="card"><h2>Jugadores</h2><div class="note" id="cont"></div><input id="q" placeholder="Buscar por nombre o código" value="${esc(q)}" aria-label="Buscar jugador"><div id="lista"></div></div>
   <div class="card"><h2>Últimos movimientos</h2><div id="hist"></div></div>`;
   lista();hist();
 }
@@ -82,8 +82,9 @@ function lista(){
   const el=document.getElementById('lista');if(!el)return;
   const t=q.trim().toLowerCase();
   const l=us.filter(u=>!t||(u.name||'').toLowerCase().includes(t)||u.id.slice(0,6).toLowerCase().includes(t)).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  el.innerHTML=l.length?l.map(u=>`<div class="u"><div class="row"><b>${esc(u.name||'?')}</b><span class="mono gold">${fmt(u.saldo||0)}</span></div><span class="note">Código ${u.id.slice(0,6)}</span>
-    <div class="row"><input id="m-${u.id}" type="number" min="1" step="1" placeholder="Monto" aria-label="Monto para ${esc(u.name||'')}"><button class="b1" data-a="cred" data-u="${u.id}">Acreditar</button><button class="b2" data-a="deb" data-u="${u.id}">Debitar</button></div></div>`).join(''):'<p class="note">No hay jugadores con ese dato.</p>';
+  const ct=document.getElementById('cont');if(ct)ct.textContent=us.length+' registrados · '+us.filter(x=>x.bloqueado).length+' bloqueados';
+  el.innerHTML=l.length?l.map(u=>`<div class="u"><div class="row"><b>${esc(u.name||'?')}${u.bloqueado?' 🚫':''}${u.admin?' (admin)':''}</b><span class="mono gold">${fmt(u.saldo||0)}</span></div><span class="note">Código ${u.id.slice(0,6)}</span>
+    <div class="row"><input id="m-${u.id}" type="number" min="1" step="1" placeholder="Monto" aria-label="Monto para ${esc(u.name||'')}"><button class="b1" data-a="cred" data-u="${u.id}">Acreditar</button><button class="b2" data-a="deb" data-u="${u.id}">Debitar</button></div>${u.admin||u.id===U.uid?'':`<div class="row"><button class="b2" data-a="blq" data-u="${u.id}">${u.bloqueado?'Desbloquear':'Bloquear'}</button><button class="b3" style="color:var(--bad)" data-a="del" data-u="${u.id}">Eliminar</button></div>`}</div>`).join(''):'<p class="note">No hay jugadores con ese dato.</p>';
 }
 function hist(){
   const el=document.getElementById('hist');if(!el)return;
@@ -106,6 +107,26 @@ document.addEventListener('submit',async e=>{
 document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a;
   if(a==='salir')return signOut(auth);
+  if(a==='blq'||a==='del'){
+    const u=us.find(x=>x.id===b.dataset.u);if(!u||u.admin)return;
+    if(a==='blq'){
+      const nuevo=!u.bloqueado;
+      if(!confirm((nuevo?'Bloquear':'Desbloquear')+' a '+u.name+'?'))return;
+      b.disabled=true;
+      try{await updateDoc(doc(db,'users',u.id),{bloqueado:nuevo})}catch(x){alert('No se pudo guardar el cambio.')}
+      b.disabled=false;return;
+    }
+    if(!confirm('Eliminar a '+u.name+'? Se borran sus datos y su saldo ('+fmt(u.saldo||0)+'). No se puede deshacer. Si está sentado en una mesa, sacalo antes.'))return;
+    b.disabled=true;
+    try{
+      const w=writeBatch(db);
+      w.delete(doc(db,'users',u.id));
+      w.set(doc(db,'bloqueados',u.id),{nombre:u.name,por:me.name,creado:serverTimestamp()});
+      if((u.saldo||0)>0)w.set(doc(collection(db,'movimientos')),{uid:u.id,nombre:u.name+' (eliminado)',monto:-(u.saldo),por:me.name,creado:serverTimestamp()});
+      await w.commit();
+    }catch(x){alert('No se pudo eliminar.');b.disabled=false}
+    return;
+  }
   const id=b.dataset.u,n=Math.floor(+document.getElementById('m-'+id).value);
   if(!(n>0))return;
   const u=us.find(x=>x.id===id),sg=a==='cred'?1:-1;

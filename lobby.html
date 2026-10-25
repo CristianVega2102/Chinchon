@@ -220,11 +220,12 @@ function juegoView(){
 }
 let sel=null;const pref={ent:'',max:'4',lim:'100'};let cfg={comision:10,entradas:[500,1000,2000],turno:20,espera:40,whatsapp:''};
 
-let U=null,me=null,mesas=[],mia=null,unsubs=[],modo='in',err='',busy=false;
+let elim=false,U=null,me=null,mesas=[],mia=null,unsubs=[],modo='in',err='',busy=false;
 
 onAuthStateChanged(auth,u=>{
-  unsubs.forEach(f=>f());unsubs=[];U=u;me=null;mesas=[];mia=null;
+  unsubs.forEach(f=>f());unsubs=[];U=u;me=null;elim=false;mesas=[];mia=null;
   if(u){
+    unsubs.push(onSnapshot(doc(db,'bloqueados',u.uid),s=>{elim=s.exists();view()}));
     unsubs.push(onSnapshot(doc(db,'config','general'),s=>{if(s.exists())cfg={...cfg,...s.data()};view()}));
     unsubs.push(onSnapshot(doc(db,'users',u.uid),s=>{me=s.exists()?s.data():null;view()}));
     unsubs.push(onSnapshot(query(collection(db,'mesas'),where('estado','in',['esperando','jugando'])),s=>{
@@ -241,7 +242,9 @@ const fail=e=>{err=MSG[e.code]||MSG[(e.code||'').replace('auth/','')]||'No se pu
 
 function view(){
   if(!U)return A.innerHTML=authView();
+  if(!me&&elim)return A.innerHTML=cartel('Cuenta eliminada','El administrador eliminó esta cuenta.');
   if(!me)return A.innerHTML='<p class="note">Cargando tu cuenta…</p>';
+  if(me.bloqueado)return A.innerHTML=cartel('Cuenta bloqueada','El administrador bloqueó esta cuenta. Si creés que es un error, escribile por WhatsApp.');
   A.innerHTML=mia?(mia.estado==='jugando'?juegoView():salaView()):lobbyView();
 }
 function authView(){
@@ -256,7 +259,12 @@ function authView(){
     <button class="b1" ${busy?'disabled':''}>${reg?'Crear cuenta y recibir 5.000 fichas':'Entrar'}</button>
   </form>`;
 }
-function head(){return `<div class="bar"><h1>${esc(me.name)}</h1><div class="row"><span class="chip">${fmt(me.saldo)}</span><button class="b3" data-a="salir">Salir</button></div></div>`}
+function cartel(t,p){
+  return `<h1>${t}</h1><div class="card"><p>${p}</p>${cfg.whatsapp?`<a class="b1" target="_blank" rel="noopener" href="https://wa.me/${cfg.whatsapp}">Escribir al administrador</a>`:''}<button class="b2" data-a="salir">Salir</button></div>`;
+}
+function head(){
+  const msg=encodeURIComponent('Hola, quiero retirar el saldo (código '+U.uid.slice(0,6)+')');
+  return `<div class="bar"><h1>${esc(me.name)}</h1><div class="row"><span class="chip">${fmt(me.saldo)}</span><a class="chip" style="background:#2b2a14;color:var(--gold);text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${cfg.whatsapp||''}?text=${msg}">Retirar</a><button class="b3" data-a="salir">Salir</button></div></div>`}
 function lobbyView(){
   const ab=mesas.filter(m=>m.estado==='esperando');const list=ab.length?ab.map(m=>`<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="mono gold">${m.uids.length}/${m.max}</span></div>
     <div class="row"><span class="note">Mesa de ${m.max} · se elimina a los ${m.limite} puntos</span></div>
