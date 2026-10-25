@@ -44,6 +44,7 @@ a.b1{text-decoration:none;text-align:center;display:block;border-radius:14px;pad
 .piles{display:flex;gap:22px;justify-content:center}.piles .gc{width:64px;flex:none}
 .mcs{display:flex;flex-wrap:wrap;gap:3px}.mc{font-family:var(--mono);font-size:12px;background:#f4ecd8;color:#222;border-radius:4px;padding:2px 4px;font-weight:700}.mc.j{background:#3b2a5c;color:var(--gold)}
 .acts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hand .gc{max-width:78px;font-size:clamp(17px,5.4vw,26px)}.gc.sel{transform:translateY(-6px)}
 </style>
 </head>
 <body>
@@ -86,37 +87,63 @@ const canClose=(h,c)=>{const r=h.filter(x=>x!==c);return isChin(r)||best(r).pts<
 const sig=(g,i)=>{do{i=(i+1)%g.orden.length}while(g.fuera[g.orden[i]]);return i};
 function repartir(g){const m=shuf([...Array(42).keys()]);g.manos={};
   g.orden.forEach(u=>{g.manos[u]=g.fuera[u]?[]:ord(m.splice(0,7))});
-  g.desc=[m.pop()];g.mazo=m;g.dealer=sig(g,g.dealer);g.turno=sig(g,g.dealer);g.fase='robar';g.nuevo=-1;g.res=null}
+  g.desc=[m.pop()];g.mazo=m;g.dealer=sig(g,g.dealer);g.turno=sig(g,g.dealer);g.fase='robar';g.nuevo=-1;g.res=null;g.listosR={};g.vence=Date.now()+(g.seg||20)*1000}
 function cerrarMano(g,uid,chin){
   const filas=g.orden.filter(u=>g.manos[u].length).map(u=>{const h=g.manos[u],d=best(h).pts;
-    const add=chin?0:u===uid?(d===0?-10:0):d;g.puntos[u]+=add;return{uid:u,add,mano:h,total:g.puntos[u]}});
+    const add=chin?0:u===uid?(d===0?-10:d):d;g.puntos[u]+=add;return{uid:u,add,mano:h,total:g.puntos[u]}});
   g.orden.forEach(u=>{if(g.manos[u].length&&g.puntos[u]>g.limite)g.fuera[u]=true});
   const act=g.orden.filter(u=>!g.fuera[u]);
   if(chin||act.length<=1){g.ganador=chin?uid:act[0];g.pagado=false}
   g.res={cerro:uid,chin,filas};g.fase='resumen'}
+
+function armarG(d){const g={orden:d.uids.slice(),nombres:Object.fromEntries(d.jugadores.map(j=>[j.uid,j.name])),puntos:Object.fromEntries(d.uids.map(x=>[x,0])),fuera:{},limite:d.limite||100,seg:cfg.turno||20,dealer:d.max-1,ganador:'',pagado:false};repartir(g);return g}
+function autoJugar(g){
+  const u=g.orden[g.turno];let h=g.manos[u];
+  if(g.fase==='robar'){if(!g.mazo.length){const t=g.desc.pop();g.mazo=shuf(g.desc);g.desc=[t]}h=ord([...h,g.mazo.pop()])}
+  let bi=0,bp=1e9,bc=-1;
+  h.forEach((c,i)=>{const p=best(h.filter((_,k)=>k!==i)).pts;if(p<bp||(p===bp&&pt(c)>bc)){bp=p;bi=i;bc=pt(c)}});
+  g.desc.push(h[bi]);g.manos[u]=h.filter((_,k)=>k!==bi);g.turno=sig(g,g.turno);g.fase='robar';g.nuevo=-1;g.vence=Date.now()+(g.seg||20)*1000;
+}
 
 /* ---------- Jugadas en línea ---------- */
 async function mover(fn){
   const ref=doc(db,'mesas',mia.id);
   await runTransaction(db,async t=>{const s=await t.get(ref);const d=s.data(),g=d.g;const x=fn(g,d,t);t.update(ref,{g,...(x||{})})});
 }
+let iniciando=null;
+async function autoIniciar(){
+  const m=mia;if(iniciando===m.id)return;iniciando=m.id;let hecho=false;
+  try{const ref=doc(db,'mesas',m.id);
+    await runTransaction(db,async t=>{const d=(await t.get(ref)).data();
+      if(d.estado!=='esperando'||d.uids.length<d.max||(d.listos||[]).length<d.max)return;
+      t.update(ref,{estado:'jugando',g:armarG(d)});hecho=true});
+  }catch(e){}
+  if(!hecho)iniciando=null;
+}
+const tmo={};
+setInterval(()=>{
+  if(!U||!mia||mia.estado!=='jugando')return;const g=mia.g;if(g.fase==='resumen')return;
+  const left=Math.ceil((g.vence-Date.now())/1000),el=document.getElementById('cd');
+  if(el){el.textContent=Math.max(0,left)+'s';el.style.color=left<=5?'var(--bad)':'var(--gold)'}
+  const mio=g.orden[g.turno]===U.uid;
+  if(left<=(mio?0:-4)){const k=mia.id+'|'+g.vence;
+    if(Date.now()-(tmo[k]||0)>6000){tmo[k]=Date.now();const ve=g.vence;
+      mover(g2=>{if(g2.vence!==ve||g2.fase==='resumen')return;autoJugar(g2)}).catch(()=>{})}}
+},1000);
 async function juego(a,b){
   if(a==='sel'){sel=+b.dataset.c;return view()}
   busy=true;err='';view();
   const u=U.uid,m=mia,uref=doc(db,'users',u);
   try{
-    if(a==='iniciar'){
-      const g={orden:m.uids.slice(),nombres:Object.fromEntries(m.jugadores.map(j=>[j.uid,j.name])),puntos:Object.fromEntries(m.uids.map(x=>[x,0])),fuera:{},limite:m.limite||100,dealer:m.max-1,ganador:'',pagado:false};
-      repartir(g);await updateDoc(doc(db,'mesas',m.id),{estado:'jugando',g});
-    }
+    if(a==='ready')await updateDoc(doc(db,'mesas',m.id),{listos:arrayUnion(u)});
     if(a==='robar')await mover(g=>{if(g.orden[g.turno]!==u||g.fase!=='robar')return;
       if(b.dataset.f==='mazo'&&!g.mazo.length){const top=g.desc.pop();g.mazo=shuf(g.desc);g.desc=[top]}
       const c=b.dataset.f==='mazo'?g.mazo.pop():g.desc.pop();g.manos[u]=ord([...g.manos[u],c]);g.nuevo=c;g.fase='tirar'});
     if(a==='tirar'&&sel!==null)await mover(g=>{if(g.orden[g.turno]!==u||g.fase!=='tirar'||!g.manos[u].includes(sel))return;
-      g.manos[u]=g.manos[u].filter(x=>x!==sel);g.desc.push(sel);g.turno=sig(g,g.turno);g.fase='robar';g.nuevo=-1});
+      g.manos[u]=g.manos[u].filter(x=>x!==sel);g.desc.push(sel);g.turno=sig(g,g.turno);g.fase='robar';g.nuevo=-1;g.vence=Date.now()+(g.seg||20)*1000});
     if(a==='cerrar'&&sel!==null)await mover(g=>{if(g.orden[g.turno]!==u||g.fase!=='tirar'||!canClose(g.manos[u],sel))return;
       g.manos[u]=g.manos[u].filter(x=>x!==sel);g.desc.push(sel);cerrarMano(g,u,isChin(g.manos[u]))});
-    if(a==='sig')await mover(g=>{if(g.fase!=='resumen'||g.ganador)return;repartir(g)});
+    if(a==='sig')await mover(g=>{if(g.fase!=='resumen'||g.ganador||g.fuera[u])return;g.listosR=g.listosR||{};g.listosR[u]=true;if(g.orden.filter(x=>!g.fuera[x]).every(x=>g.listosR[x]))repartir(g)});
     if(a==='reeng')await mover((g,d,t)=>{if(!g.fuera[u]||g.ganador||me.saldo<d.entrada)return;
       g.puntos[u]=Math.max(...g.orden.filter(x=>x!==u&&!g.fuera[x]).map(x=>g.puntos[x]));delete g.fuera[u];
       t.update(uref,{saldo:increment(-d.entrada)});return{pozo:increment(d.entrada)}});
@@ -135,7 +162,8 @@ function juegoView(){
   const msg=g.fase==='resumen'?'Fin de la mano':fuera?'Estás eliminado. Podés mirar la partida.':mi?(g.fase==='robar'?'Tu turno: sacá del mazo o del descarte':'Elegí una carta para descartar o cerrar'):'Juega '+nom(g.orden[g.turno])+'…';
   const top=g.desc[g.desc.length-1],mk={};
   best(yo).melds.forEach((mm,k)=>{for(let i=0;i<yo.length;i++)if(mm>>i&1)mk[yo[i]]=COL[k%4]});
-  const hand=fuera?'':yo.map(n=>gcard(n,(sel===n?'sel ':'')+(g.nuevo===n?'nw':''),`data-a="sel" data-c="${n}" role="button" tabindex="0"`).replace(/<\/div>$/,mk[n]?`<i style="background:${mk[n]}"></i></div>`:'</div>')).join('');
+  const hs=fuera?[]:yo.map(n=>gcard(n,(sel===n?'sel ':'')+(g.nuevo===n?'nw':''),`data-a="sel" data-c="${n}" role="button" tabindex="0"`).replace(/<\/div>$/,mk[n]?`<i style="background:${mk[n]}"></i></div>`:'</div>'));
+  const kk=Math.floor(hs.length/2),hand=`<div class="hand">${hs.slice(0,kk).join('')}</div><div class="hand" style="padding-top:8px">${hs.slice(kk).join('')}</div>`;
   let res='';
   if(g.fase==='resumen'){
     const R=g.res,gan=g.ganador;
@@ -143,18 +171,18 @@ function juegoView(){
     let bt='';
     if(gan){const prize=Math.floor(m.pozo*(100-cfg.comision)/100);
       bt=`<h2>${R.chin?'¡CHINCHÓN! ':''}Ganó ${nom(gan)}</h2>`+(g.pagado?`<button class="b1" data-a="fin">Volver al lobby</button>`:gan===u?`<button class="b1" data-a="cobrar" ${busy?'disabled':''}>Cobrar ${fmt(prize)}</button><p class="note">Pozo menos ${cfg.comision}% de comisión.</p>`:'<p class="note">Esperando que el ganador cobre el pozo.</p>');
-    }else bt=`<h2>${nom(R.cerro)} cerró la mano</h2>`+(fuera?`<button class="b2" data-a="reeng" ${busy||me.saldo<m.entrada?'disabled':''}>Reengancharse por ${fmt(m.entrada)}</button>`:'')+`<button class="b1" data-a="sig" ${busy?'disabled':''}>Siguiente mano</button>`;
+    }else bt=`<h2>${nom(R.cerro)} cerró la mano</h2>`+(fuera?`<button class="b2" data-a="reeng" ${busy||me.saldo<m.entrada?'disabled':''}>Reengancharse por ${fmt(m.entrada)}</button>`:'')+`<button class="b1" data-a="sig" ${busy||fuera||(g.listosR||{})[u]?'disabled':''}>${(g.listosR||{})[u]?'Esperando a los demás':'Listo para la siguiente mano'} (${Object.keys(g.listosR||{}).length}/${g.orden.filter(x=>!g.fuera[x]).length})</button>`;
     res=`<div class="card">${bt}${filas}</div>`;
   }
   return `${head()}<div class="pozo"><span class="note">${esc(m.nombre)} · Entrada ${fmt(m.entrada)}</span><div style="text-align:right"><span class="note">Pozo</span><br><b>${fmt(m.pozo)}</b></div></div>
   <div style="display:grid;grid-template-columns:repeat(${g.orden.length-1},1fr);gap:8px">${ops}</div>
-  <div class="card"><b style="text-align:center">${msg}</b>${err?`<div class="err">${err}</div>`:''}
+  <div class="card"><div class="row" style="justify-content:center"><b>${msg}</b>${g.fase==='resumen'?'':`<span id="cd" class="mono gold">${Math.max(0,Math.ceil((g.vence-Date.now())/1000))}s</span>`}</div>${err?`<div class="err">${err}</div>`:''}
     <div class="piles"><div class="gc back ${mi&&g.fase==='robar'?'go':''}" data-a="robar" data-f="mazo" role="button" tabindex="0" aria-label="Sacar del mazo"></div>${gcard(top,mi&&g.fase==='robar'?'go':'',`data-a="robar" data-f="desc" role="button" tabindex="0" aria-label="Levantar del descarte"`)}</div>
     <div class="note" style="text-align:center">Mazo ${g.mazo.length} · Tus puntos ${g.puntos[u]}/${g.limite}</div></div>
-  ${res}<div class="hand">${hand}</div>
+  ${res}${hand}
   <div class="acts"><button class="b2" data-a="tirar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy?'':'disabled'}>Descartar</button><button class="b1" data-a="cerrar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy&&canClose(yo,sel)?'':'disabled'}>Cerrar mano</button></div>`;
 }
-let sel=null;const pref={ent:'',max:'4',lim:'100'};let cfg={comision:10,entradas:[500,1000,2000],whatsapp:''};
+let sel=null;const pref={ent:'',max:'4',lim:'100'};let cfg={comision:10,entradas:[500,1000,2000],turno:20,whatsapp:''};
 
 let U=null,me=null,mesas=[],mia=null,unsubs=[],modo='in',err='',busy=false;
 
@@ -166,6 +194,7 @@ onAuthStateChanged(auth,u=>{
     unsubs.push(onSnapshot(query(collection(db,'mesas'),where('estado','in',['esperando','jugando'])),s=>{
       mesas=s.docs.map(d=>({id:d.id,...d.data()})).filter(m=>m.uids.length);
       mia=mesas.find(m=>m.uids.includes(u.uid))||null;view();
+      if(mia&&mia.estado==='esperando'&&mia.uids.length===mia.max&&(mia.listos||[]).length===mia.max)autoIniciar();
     }));
   }
   view();
@@ -206,17 +235,17 @@ function lobbyView(){
   <h2>Mesas abiertas</h2>${list}`;
 }
 function salaView(){
-  const m=mia,js=m.jugadores,full=js.length===m.max;
+  const m=mia,js=m.jugadores,full=js.length===m.max,yaListo=(m.listos||[]).includes(U.uid);
   const seats=[...Array(m.max).keys()].map(i=>{const j=js[i];
-    return j?`<div class="seat ${j.uid===U.uid?'me':''}"><div class="av">${esc(j.name[0].toUpperCase())}</div><b>${esc(j.name)}</b>${i===0?'<span class="tag">ANFITRIÓN</span>':''}<span class="tag" style="color:var(--ok)">Sentado</span></div>`
+    return j?`<div class="seat ${j.uid===U.uid?'me':''}"><div class="av">${esc(j.name[0].toUpperCase())}</div><b>${esc(j.name)}</b>${i===0?'<span class="tag">ANFITRIÓN</span>':''}<span class="tag" style="color:var(--ok)">${(m.listos||[]).includes(j.uid)?'Listo ✓':'Sentado'}</span></div>`
       :`<div class="seat empty"><div class="av">?</div><b>Buscando rival…</b><span class="tag">Puesto libre</span></div>`}).join('');
   const txt=encodeURIComponent(`Te espero en ${m.nombre} de Chinchón. Entrada ${fmt(m.entrada)} en fichas: ${location.href}`);
   return `${head()}<h1>${esc(m.nombre)}</h1><p class="note">Mesa de ${m.max} jugadores · se elimina a los ${m.limite} puntos</p>
   <div class="pozo"><span class="note">Entrada ${fmt(m.entrada)}</span><div style="text-align:right"><span class="note">Pozo acumulado</span><br><b>${fmt(m.pozo)}</b></div></div>
   <div class="card"><div class="row"><h2>${full?'Mesa completa':'Esperando jugadores…'}</h2><span class="mono gold">${js.length}/${m.max}</span></div></div>
   <div class="seats">${seats}</div>
-  <button class="b1" data-a="iniciar" ${full&&!busy?'':'disabled'}>Iniciar partida</button>
-  <p class="note">${full?'Cualquiera de los jugadores puede iniciar.':'Se necesitan ${m.max} jugadores para empezar.'}</p>${err?`<div class="err">${err}</div>`:''}
+  <button class="b1" data-a="ready" ${full&&!yaListo&&!busy?'':'disabled'}>${yaListo?`Esperando a los demás (${(m.listos||[]).length}/${m.max})`:'Estoy listo'}</button>
+  <p class="note">${full?'La partida empieza cuando todos toquen Estoy listo.':`Se necesitan ${m.max} jugadores para empezar.`}</p>${err?`<div class="err">${err}</div>`:''}
   <a class="b1" href="https://wa.me/?text=${txt}" target="_blank" rel="noopener">Invitar amigo por WhatsApp</a>
   <button class="b2" data-a="salirMesa" ${busy?'disabled':''}>Salir de la mesa (te devolvemos la entrada)</button>`;
 }
@@ -237,7 +266,7 @@ document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a;
   if(a==='modo'){modo=b.dataset.v;err='';return view()}
   if(a==='salir')return signOut(auth);
-  if(['robar','tirar','cerrar','sig','reeng','cobrar','iniciar','sel','fin'].includes(a))return juego(a,b);
+  if(['robar','tirar','cerrar','sig','reeng','cobrar','ready','sel','fin'].includes(a))return juego(a,b);
   err='';busy=true;view();
   try{
     const uref=doc(db,'users',U.uid),batch=writeBatch(db);
@@ -245,17 +274,17 @@ document.addEventListener('click',async e=>{
       const entrada=+pref.ent||cfg.entradas[0];
       if(me.saldo<entrada)throw{code:'permission-denied'};
       const r=doc(collection(db,'mesas'));
-      batch.set(r,{nombre:'Mesa #'+(100+Math.floor(Math.random()*900)),entrada,max:+pref.max,limite:+pref.lim,pozo:entrada,anfitrion:U.uid,estado:'esperando',uids:[U.uid],jugadores:[{uid:U.uid,name:me.name}],creada:serverTimestamp()});
+      batch.set(r,{nombre:'Mesa #'+(100+Math.floor(Math.random()*900)),entrada,max:+pref.max,limite:+pref.lim,listos:[],pozo:entrada,anfitrion:U.uid,estado:'esperando',uids:[U.uid],jugadores:[{uid:U.uid,name:me.name}],creada:serverTimestamp()});
       batch.update(uref,{saldo:increment(-entrada)});
     }
     if(a==='unirse'){
       const m=mesas.find(x=>x.id===b.dataset.id);
-      batch.update(doc(db,'mesas',m.id),{uids:arrayUnion(U.uid),jugadores:arrayUnion({uid:U.uid,name:me.name}),pozo:increment(m.entrada)});
+      batch.update(doc(db,'mesas',m.id),{uids:arrayUnion(U.uid),jugadores:arrayUnion({uid:U.uid,name:me.name}),pozo:increment(m.entrada),listos:[]});
       batch.update(uref,{saldo:increment(-m.entrada)});
     }
     if(a==='salirMesa'){
       const m=mia;
-      batch.update(doc(db,'mesas',m.id),{uids:arrayRemove(U.uid),jugadores:arrayRemove(m.jugadores.find(j=>j.uid===U.uid)),pozo:increment(-m.entrada)});
+      batch.update(doc(db,'mesas',m.id),{uids:arrayRemove(U.uid),jugadores:arrayRemove(m.jugadores.find(j=>j.uid===U.uid)),pozo:increment(-m.entrada),listos:[]});
       batch.update(uref,{saldo:increment(m.entrada),mesaSalida:m.id});
     }
     await batch.commit();busy=false;view();

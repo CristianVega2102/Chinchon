@@ -167,7 +167,7 @@ function endRound(closer,chin){
   G.players.forEach((p,i)=>{
     if(!p.in)return;
     const d=best(p.hand).pts;
-    let add=i===closer?(chin?0:d===0?-10:0):d;
+    let add=i===closer?(chin?0:d===0?-10:d):d;
     if(chin&&i!==closer)add=0;
     p.score+=add;
     rows.push({p,add});
