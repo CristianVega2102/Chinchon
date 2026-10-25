@@ -89,14 +89,18 @@ const canClose=(h,c)=>{const r=h.filter(x=>x!==c);return isChin(r)||best(r).pts<
 const sig=(g,i)=>{do{i=(i+1)%g.orden.length}while(g.fuera[g.orden[i]]);return i};
 function repartir(g){const m=shuf([...Array(50).keys()]);g.manos={};
   g.orden.forEach(u=>{g.manos[u]=g.fuera[u]?[]:ord(m.splice(0,7))});
-  g.desc=[m.pop()];g.mazo=m;g.dealer=sig(g,g.dealer);g.turno=sig(g,g.dealer);g.fase='robar';g.nuevo=-1;g.res=null;g.listosR={};g.vence=Date.now()+(g.seg||20)*1000}
+  g.desc=[m.pop()];g.mazo=m;g.dealer=sig(g,g.dealer);g.turno=sig(g,g.dealer);g.fase='robar';g.nuevo=-1;g.res=null;g.listosR={};g.venceReeng=0;g.vence=Date.now()+(g.seg||20)*1000}
 function cerrarMano(g,uid,chin){
   const filas=g.orden.filter(u=>g.manos[u].length).map(u=>{const h=g.manos[u],d=best(h).pts;
     const add=chin?0:u===uid?(d===0?-10:d):d;g.puntos[u]+=add;return{uid:u,add,mano:h,total:g.puntos[u]}});
-  g.orden.forEach(u=>{if(g.manos[u].length&&g.puntos[u]>g.limite)g.fuera[u]=true});
+  const nuevos=g.orden.filter(u=>g.manos[u].length&&g.puntos[u]>g.limite);
+  nuevos.forEach(u=>{g.fuera[u]=true});
   const act=g.orden.filter(u=>!g.fuera[u]);
   if(chin||act.length<=1){g.ganador=chin?uid:act[0];g.pagado=false}
-  g.res={cerro:uid,chin,filas};g.fase='resumen';g.venceR=g.ganador?0:Date.now()+(g.esp||ESPERA)*1000}
+  g.venceReeng=(!g.ganador&&nuevos.length)?Date.now()+(g.segReeng||20)*1000:0;
+  g.res={cerro:uid,chin,filas};g.fase='resumen';
+  g.venceR=g.ganador?0:(g.venceReeng||Date.now())+(g.esp||ESPERA)*1000}
+const todosListos=g=>g.orden.filter(x=>!g.fuera[x]).every(x=>g.listosR[x])&&Date.now()>=(g.venceReeng||0);
 
 const ESPERA=40;
 function ordenar(h){const s=ord(h),b=best(s),usado=new Set(),out=[],col={};
@@ -114,7 +118,7 @@ function vencioListo(g){
   g.res=g.res||{cerro:'',chin:false,filas:[]};
   if(lis.length<=1){g.ganador=lis[0];g.pagado=false;g.res.motivo='tiempo';g.res.quien=tarde}else repartir(g);
 }
-function armarG(d){const g={orden:d.uids.slice(),nombres:Object.fromEntries(d.jugadores.map(j=>[j.uid,j.name])),puntos:Object.fromEntries(d.uids.map(x=>[x,0])),fuera:{},limite:d.limite||100,seg:cfg.turno||20,esp:cfg.espera||ESPERA,dealer:d.max-1,ganador:'',pagado:false};repartir(g);return g}
+function armarG(d){const g={orden:d.uids.slice(),nombres:Object.fromEntries(d.jugadores.map(j=>[j.uid,j.name])),puntos:Object.fromEntries(d.uids.map(x=>[x,0])),fuera:{},limite:d.limite||100,seg:cfg.turno||20,esp:cfg.espera||ESPERA,segReeng:cfg.segReeng||20,dealer:d.max-1,ganador:'',pagado:false};repartir(g);return g}
 function autoJugar(g){
   const u=g.orden[g.turno];let h=g.manos[u];
   if(g.fase==='robar'){if(!g.mazo.length){const t=g.desc.pop();g.mazo=shuf(g.desc);g.desc=[t]}h=ord([...h,g.mazo.pop()])}
@@ -145,6 +149,10 @@ setInterval(()=>{
     if(g.ganador||!g.venceR)return;
     const lr=Math.ceil((g.venceR-Date.now())/1000),er=document.getElementById('cdr');
     if(er)er.textContent=Math.max(0,lr)+'s';
+    const rr=document.getElementById('cdre');if(rr&&g.venceReeng)rr.textContent=Math.max(0,Math.ceil((g.venceReeng-Date.now())/1000))+'s';
+    if(g.venceReeng&&Date.now()>=g.venceReeng+500&&todosListos(g)){const k2=mia.id+'|g|'+g.venceReeng;
+      if(Date.now()-(tmo[k2]||0)>6000){tmo[k2]=Date.now();const vv=g.venceReeng;
+        mover(g2=>{if(g2.fase!=='resumen'||g2.ganador||g2.venceReeng!==vv)return;if(todosListos(g2))repartir(g2)}).catch(()=>{})}}
     if(lr<=-2){const k=mia.id+'|r|'+g.venceR;
       if(Date.now()-(tmo[k]||0)>6000){tmo[k]=Date.now();const ve=g.venceR;
         mover(g2=>{if(g2.fase!=='resumen'||g2.ganador||g2.venceR!==ve)return;vencioListo(g2)}).catch(()=>{})}}
@@ -171,7 +179,7 @@ async function juego(a,b){
       g.manos[u]=g.manos[u].filter(x=>x!==sel);g.desc.push(sel);g.turno=sig(g,g.turno);g.fase='robar';g.nuevo=-1;g.vence=Date.now()+(g.seg||20)*1000});
     if(a==='cerrar'&&sel!==null)await mover(g=>{if(g.orden[g.turno]!==u||g.fase!=='tirar'||!canClose(g.manos[u],sel))return;
       g.manos[u]=g.manos[u].filter(x=>x!==sel);g.desc.push(sel);cerrarMano(g,u,isChin(g.manos[u]))});
-    if(a==='sig')await mover(g=>{if(g.fase!=='resumen'||g.ganador||g.fuera[u])return;g.listosR=g.listosR||{};g.listosR[u]=true;if(g.orden.filter(x=>!g.fuera[x]).every(x=>g.listosR[x]))repartir(g)});
+    if(a==='sig')await mover(g=>{if(g.fase!=='resumen'||g.ganador||g.fuera[u])return;g.listosR=g.listosR||{};g.listosR[u]=true;if(todosListos(g))repartir(g)});
     if(a==='reeng')await mover((g,d,t)=>{if(!g.fuera[u]||g.ganador||me.saldo<(d.reeng||d.entrada))return;
       g.puntos[u]=Math.max(...g.orden.filter(x=>x!==u&&!g.fuera[x]).map(x=>g.puntos[x]));delete g.fuera[u];
       t.update(uref,{saldo:increment(-(d.reeng||d.entrada))});return{pozo:increment(d.reeng||d.entrada)}});
@@ -183,7 +191,7 @@ async function juego(a,b){
       const act=g.orden.filter(x=>!g.fuera[x]);
       g.res=g.res||{cerro:'',chin:false,filas:[]};
       if(act.length<=1){g.ganador=act[0];g.pagado=false;g.fase='resumen';g.res.motivo='abandono';g.res.quien=[u];return}
-      if(g.fase==='resumen'){if(act.every(x=>g.listosR[x]))repartir(g);return}
+      if(g.fase==='resumen'){if(todosListos(g))repartir(g);return}
       if(g.orden[g.turno]===u){g.turno=sig(g,g.turno);g.fase='robar';g.nuevo=-1;g.vence=Date.now()+(g.seg||20)*1000}
     });
     if(a==='fin')await updateDoc(doc(db,'mesas',m.id),{estado:'terminada'});
@@ -207,7 +215,9 @@ function juegoView(){
     let bt='';
     if(gan){const prize=Math.floor(m.pozo*(100-cfg.comision)/100);
       bt=`<h2>${R.chin?'¡CHINCHÓN! ':''}Ganó ${nom(gan)}</h2>`+(R.motivo?`<p class="note">${(R.quien||[]).map(nom).join(', ')} ${R.motivo==='tiempo'?'no tocó Listo a tiempo':'abandonó la partida'}.</p>`:'')+(g.pagado?`<button class="b1" data-a="fin">Volver al lobby</button>`:gan===u?`<button class="b1" data-a="cobrar" ${busy?'disabled':''}>Cobrar ${fmt(prize)}</button><p class="note">Pozo menos ${cfg.comision}% de comisión.</p>`:'<p class="note">Esperando que el ganador cobre el pozo.</p>');
-    }else bt=`<h2>${nom(R.cerro)} cerró la mano</h2>`+(fuera?`<button class="b2" data-a="reeng" ${busy||me.saldo<(m.reeng||m.entrada)?'disabled':''}>Reengancharse por ${fmt(m.reeng||m.entrada)}</button>`:'')+(fuera?'':`<p class="note">Tenés <b id="cdr" class="mono gold">${Math.max(0,Math.ceil((g.venceR-Date.now())/1000))}s</b> para tocar Listo, o perdés la partida.</p>`)+`<button class="b1" data-a="sig" ${busy||fuera||(g.listosR||{})[u]?'disabled':''}>${(g.listosR||{})[u]?'Esperando a los demás':'Listo para la siguiente mano'} (${Object.keys(g.listosR||{}).length}/${g.orden.filter(x=>!g.fuera[x]).length})</button>`;
+    }else{const vr=g.venceReeng?Math.max(0,Math.ceil((g.venceReeng-Date.now())/1000)):0;
+      const ven=vr>0?`<p class="note">${fuera?'Tenés':'Esperando un posible reenganche:'} <b id="cdre" class="mono gold">${vr}s</b>${fuera?' para reengancharte.':''}</p>`:'';
+      bt=`<h2>${nom(R.cerro)} cerró la mano</h2>`+ven+(fuera?`<button class="b2" data-a="reeng" ${busy||me.saldo<(m.reeng||m.entrada)?'disabled':''}>Reengancharse por ${fmt(m.reeng||m.entrada)}</button>`:'')+(fuera?'':`<p class="note">Tenés <b id="cdr" class="mono gold">${Math.max(0,Math.ceil((g.venceR-Date.now())/1000))}s</b> para tocar Listo, o perdés la partida.</p>`)+`<button class="b1" data-a="sig" ${busy||fuera||(g.listosR||{})[u]?'disabled':''}>${(g.listosR||{})[u]?'Esperando a los demás':'Listo para la siguiente mano'} (${Object.keys(g.listosR||{}).length}/${g.orden.filter(x=>!g.fuera[x]).length})</button>`;}
     res=`<div class="card">${bt}${filas}</div>`;
   }
   return `${head()}<div class="pozo"><span class="note">${esc(m.nombre)} · Entrada ${fmt(m.entrada)}</span><div style="text-align:right"><span class="note">Pozo</span><br><b>${fmt(m.pozo)}</b></div></div>
@@ -219,7 +229,7 @@ function juegoView(){
   <div class="acts"><button class="b2" data-a="tirar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy?'':'disabled'}>Descartar</button><button class="b1" data-a="cerrar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy&&canClose(yo,sel)?'':'disabled'}>Cerrar mano</button></div>
   ${g.ganador||fuera?'':'<button class="b3" data-a="aband">Abandonar partida</button>'}`;
 }
-let sel=null;const pref={ent:'',max:'4',lim:'100'};let cfg={comision:10,entradas:[500,1000,2000],turno:20,espera:40,reenganche:0,whatsapp:''};
+let sel=null;const pref={ent:'',max:'4',lim:'100'};let cfg={comision:10,entradas:[500,1000,2000],turno:20,espera:40,reenganche:0,segReeng:20,whatsapp:''};
 
 let elim=false,U=null,me=null,mesas=[],mia=null,unsubs=[],modo='in',err='',busy=false;
 
