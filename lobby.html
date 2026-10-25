@@ -45,6 +45,7 @@ a.b1{text-decoration:none;text-align:center;display:block;border-radius:14px;pad
 .mcs{display:flex;flex-wrap:wrap;gap:3px}.mc{font-family:var(--mono);font-size:12px;background:#f4ecd8;color:#222;border-radius:4px;padding:2px 4px;font-weight:700}.mc.j{background:#3b2a5c;color:var(--gold)}
 .acts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .hand .gc{max-width:78px;font-size:clamp(17px,5.4vw,26px)}.gc.sel{transform:translateY(-6px)}
+.grp{display:flex;gap:3px;padding:3px;border:1px solid var(--ok);border-radius:7px}
 </style>
 </head>
 <body>
@@ -94,8 +95,24 @@ function cerrarMano(g,uid,chin){
   g.orden.forEach(u=>{if(g.manos[u].length&&g.puntos[u]>g.limite)g.fuera[u]=true});
   const act=g.orden.filter(u=>!g.fuera[u]);
   if(chin||act.length<=1){g.ganador=chin?uid:act[0];g.pagado=false}
-  g.res={cerro:uid,chin,filas};g.fase='resumen'}
+  g.res={cerro:uid,chin,filas};g.fase='resumen';g.venceR=g.ganador?0:Date.now()+ESPERA*1000}
 
+const ESPERA=40;
+function ordenar(h){const s=ord(h),b=best(s),usado=new Set(),out=[],col={};
+  b.melds.forEach((m,k)=>{const gr=[];for(let i=0;i<s.length;i++)if(m>>i&1){gr.push(s[i]);usado.add(i)}
+    gr.sort((x,y)=>(x>=40)-(y>=40)||x-y).forEach(c=>{col[c]=COL[k%4];out.push(c)})});
+  s.forEach((c,i)=>{if(!usado.has(i))out.push(c)});return{cartas:out,col}}
+function desglose(mano){const s=ord(mano),b=best(s),usado=new Set();
+  const grupos=b.melds.map(m=>{const gr=[];for(let i=0;i<s.length;i++)if(m>>i&1){gr.push(s[i]);usado.add(i)}return gr.sort((x,y)=>(x>=40)-(y>=40)||x-y)});
+  return{grupos,sueltas:s.filter((_,i)=>!usado.has(i)),pts:b.pts}}
+function vencioListo(g){
+  const act=g.orden.filter(x=>!g.fuera[x]),lis=act.filter(x=>g.listosR[x]);
+  if(!lis.length){g.venceR=Date.now()+ESPERA*1000;return}
+  const tarde=act.filter(x=>!g.listosR[x]);
+  tarde.forEach(x=>{g.fuera[x]=true;g.manos[x]=[]});
+  g.res=g.res||{cerro:'',chin:false,filas:[]};
+  if(lis.length<=1){g.ganador=lis[0];g.pagado=false;g.res.motivo='tiempo';g.res.quien=tarde}else repartir(g);
+}
 function armarG(d){const g={orden:d.uids.slice(),nombres:Object.fromEntries(d.jugadores.map(j=>[j.uid,j.name])),puntos:Object.fromEntries(d.uids.map(x=>[x,0])),fuera:{},limite:d.limite||100,seg:cfg.turno||20,dealer:d.max-1,ganador:'',pagado:false};repartir(g);return g}
 function autoJugar(g){
   const u=g.orden[g.turno];let h=g.manos[u];
@@ -122,7 +139,16 @@ async function autoIniciar(){
 }
 const tmo={};
 setInterval(()=>{
-  if(!U||!mia||mia.estado!=='jugando')return;const g=mia.g;if(g.fase==='resumen')return;
+  if(!U||!mia||mia.estado!=='jugando')return;const g=mia.g;
+  if(g.fase==='resumen'){
+    if(g.ganador||!g.venceR)return;
+    const lr=Math.ceil((g.venceR-Date.now())/1000),er=document.getElementById('cdr');
+    if(er)er.textContent=Math.max(0,lr)+'s';
+    if(lr<=-2){const k=mia.id+'|r|'+g.venceR;
+      if(Date.now()-(tmo[k]||0)>6000){tmo[k]=Date.now();const ve=g.venceR;
+        mover(g2=>{if(g2.fase!=='resumen'||g2.ganador||g2.venceR!==ve)return;vencioListo(g2)}).catch(()=>{})}}
+    return;
+  }
   const left=Math.ceil((g.vence-Date.now())/1000),el=document.getElementById('cd');
   if(el){el.textContent=Math.max(0,left)+'s';el.style.color=left<=5?'var(--bad)':'var(--gold)'}
   const mio=g.orden[g.turno]===U.uid;
@@ -132,6 +158,7 @@ setInterval(()=>{
 },1000);
 async function juego(a,b){
   if(a==='sel'){sel=+b.dataset.c;return view()}
+  if(a==='aband'&&!confirm('Si abandonás, perdés la partida y el pozo. ¿Seguro?'))return;
   busy=true;err='';view();
   const u=U.uid,m=mia,uref=doc(db,'users',u);
   try{
@@ -149,6 +176,15 @@ async function juego(a,b){
       t.update(uref,{saldo:increment(-d.entrada)});return{pozo:increment(d.entrada)}});
     if(a==='cobrar')await mover((g,d,t)=>{if(g.ganador!==u||g.pagado)return;g.pagado=true;
       t.update(uref,{saldo:increment(Math.floor(d.pozo*(100-cfg.comision)/100)),mesaCobro:m.id})});
+    if(a==='aband')await mover(g=>{
+      if(g.ganador||g.fuera[u])return;
+      g.fuera[u]=true;g.manos[u]=[];
+      const act=g.orden.filter(x=>!g.fuera[x]);
+      g.res=g.res||{cerro:'',chin:false,filas:[]};
+      if(act.length<=1){g.ganador=act[0];g.pagado=false;g.fase='resumen';g.res.motivo='abandono';g.res.quien=[u];return}
+      if(g.fase==='resumen'){if(act.every(x=>g.listosR[x]))repartir(g);return}
+      if(g.orden[g.turno]===u){g.turno=sig(g,g.turno);g.fase='robar';g.nuevo=-1;g.vence=Date.now()+(g.seg||20)*1000}
+    });
     if(a==='fin')await updateDoc(doc(db,'mesas',m.id),{estado:'terminada'});
     sel=null;busy=false;view();
   }catch(x){fail(x)}
@@ -160,18 +196,17 @@ function juegoView(){
   const nom=x=>esc(g.nombres[x]);
   const ops=g.orden.filter(x=>x!==u).map(x=>`<div class="seat ${g.orden[g.turno]===x&&g.fase!=='resumen'?'me':''}" style="min-height:0;padding:10px 4px;${g.fuera[x]?'opacity:.45':''}"><div class="av" style="width:40px;height:40px;font-size:16px">${esc(g.nombres[x][0].toUpperCase())}</div><b style="font-size:13px">${nom(x)}</b><span class="mono" style="font-size:13px">${g.puntos[x]} pts</span><span class="tag">${g.fuera[x]?'Eliminado':(g.manos[x]||[]).length+' cartas'}</span></div>`).join('');
   const msg=g.fase==='resumen'?'Fin de la mano':fuera?'Estás eliminado. Podés mirar la partida.':mi?(g.fase==='robar'?'Tu turno: sacá del mazo o del descarte':'Elegí una carta para descartar o cerrar'):'Juega '+nom(g.orden[g.turno])+'…';
-  const top=g.desc[g.desc.length-1],mk={};
-  best(yo).melds.forEach((mm,k)=>{for(let i=0;i<yo.length;i++)if(mm>>i&1)mk[yo[i]]=COL[k%4]});
-  const hs=fuera?[]:yo.map(n=>gcard(n,(sel===n?'sel ':'')+(g.nuevo===n?'nw':''),`data-a="sel" data-c="${n}" role="button" tabindex="0"`).replace(/<\/div>$/,mk[n]?`<i style="background:${mk[n]}"></i></div>`:'</div>'));
+  const top=g.desc[g.desc.length-1],OR=ordenar(yo),mk=OR.col;
+  const hs=fuera?[]:OR.cartas.map(n=>gcard(n,(sel===n?'sel ':'')+(g.nuevo===n?'nw':''),`data-a="sel" data-c="${n}" role="button" tabindex="0"`).replace(/<\/div>$/,mk[n]?`<i style="background:${mk[n]}"></i></div>`:'</div>'));
   const kk=Math.floor(hs.length/2),hand=`<div class="hand">${hs.slice(0,kk).join('')}</div><div class="hand" style="padding-top:8px">${hs.slice(kk).join('')}</div>`;
   let res='';
   if(g.fase==='resumen'){
     const R=g.res,gan=g.ganador;
-    const filas=R.filas.map(f=>`<div class="card" style="padding:10px"><div class="row"><b>${nom(f.uid)}${g.fuera[f.uid]?' · eliminado':''}</b><span class="mono" style="color:${f.add>0?'var(--bad)':'var(--ok)'}">${f.add>0?'+':''}${f.add} → ${f.total}</span></div><div class="mcs">${ord(f.mano).map(mini).join('')}</div></div>`).join('');
+    const filas=R.filas.map(f=>`<div class="card" style="padding:10px"><div class="row"><b>${nom(f.uid)}${g.fuera[f.uid]?' · eliminado':''}</b><span class="mono" style="color:${f.add>0?'var(--bad)':'var(--ok)'}">${f.add>0?'+':''}${f.add} → ${f.total}</span></div>${(()=>{const d=desglose(f.mano);return `<div class="mcs">${d.grupos.map(gr=>`<span class="grp">${gr.map(mini).join('')}</span>`).join('')}</div>`+(d.sueltas.length?`<div class="mcs"><span class="note">Suman ${d.pts}:</span>${d.sueltas.map(mini).join('')}</div>`:'<div class="note">Todas combinadas</div>')})()}</div>`).join('');
     let bt='';
     if(gan){const prize=Math.floor(m.pozo*(100-cfg.comision)/100);
-      bt=`<h2>${R.chin?'¡CHINCHÓN! ':''}Ganó ${nom(gan)}</h2>`+(g.pagado?`<button class="b1" data-a="fin">Volver al lobby</button>`:gan===u?`<button class="b1" data-a="cobrar" ${busy?'disabled':''}>Cobrar ${fmt(prize)}</button><p class="note">Pozo menos ${cfg.comision}% de comisión.</p>`:'<p class="note">Esperando que el ganador cobre el pozo.</p>');
-    }else bt=`<h2>${nom(R.cerro)} cerró la mano</h2>`+(fuera?`<button class="b2" data-a="reeng" ${busy||me.saldo<m.entrada?'disabled':''}>Reengancharse por ${fmt(m.entrada)}</button>`:'')+`<button class="b1" data-a="sig" ${busy||fuera||(g.listosR||{})[u]?'disabled':''}>${(g.listosR||{})[u]?'Esperando a los demás':'Listo para la siguiente mano'} (${Object.keys(g.listosR||{}).length}/${g.orden.filter(x=>!g.fuera[x]).length})</button>`;
+      bt=`<h2>${R.chin?'¡CHINCHÓN! ':''}Ganó ${nom(gan)}</h2>`+(R.motivo?`<p class="note">${(R.quien||[]).map(nom).join(', ')} ${R.motivo==='tiempo'?'no tocó Listo a tiempo':'abandonó la partida'}.</p>`:'')+(g.pagado?`<button class="b1" data-a="fin">Volver al lobby</button>`:gan===u?`<button class="b1" data-a="cobrar" ${busy?'disabled':''}>Cobrar ${fmt(prize)}</button><p class="note">Pozo menos ${cfg.comision}% de comisión.</p>`:'<p class="note">Esperando que el ganador cobre el pozo.</p>');
+    }else bt=`<h2>${nom(R.cerro)} cerró la mano</h2>`+(fuera?`<button class="b2" data-a="reeng" ${busy||me.saldo<m.entrada?'disabled':''}>Reengancharse por ${fmt(m.entrada)}</button>`:'')+(fuera?'':`<p class="note">Tenés <b id="cdr" class="mono gold">${Math.max(0,Math.ceil((g.venceR-Date.now())/1000))}s</b> para tocar Listo, o perdés la partida.</p>`)+`<button class="b1" data-a="sig" ${busy||fuera||(g.listosR||{})[u]?'disabled':''}>${(g.listosR||{})[u]?'Esperando a los demás':'Listo para la siguiente mano'} (${Object.keys(g.listosR||{}).length}/${g.orden.filter(x=>!g.fuera[x]).length})</button>`;
     res=`<div class="card">${bt}${filas}</div>`;
   }
   return `${head()}<div class="pozo"><span class="note">${esc(m.nombre)} · Entrada ${fmt(m.entrada)}</span><div style="text-align:right"><span class="note">Pozo</span><br><b>${fmt(m.pozo)}</b></div></div>
@@ -180,7 +215,8 @@ function juegoView(){
     <div class="piles"><div class="gc back ${mi&&g.fase==='robar'?'go':''}" data-a="robar" data-f="mazo" role="button" tabindex="0" aria-label="Sacar del mazo"></div>${gcard(top,mi&&g.fase==='robar'?'go':'',`data-a="robar" data-f="desc" role="button" tabindex="0" aria-label="Levantar del descarte"`)}</div>
     <div class="note" style="text-align:center">Mazo ${g.mazo.length} · Tus puntos ${g.puntos[u]}/${g.limite}</div></div>
   ${res}${hand}
-  <div class="acts"><button class="b2" data-a="tirar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy?'':'disabled'}>Descartar</button><button class="b1" data-a="cerrar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy&&canClose(yo,sel)?'':'disabled'}>Cerrar mano</button></div>`;
+  <div class="acts"><button class="b2" data-a="tirar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy?'':'disabled'}>Descartar</button><button class="b1" data-a="cerrar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy&&canClose(yo,sel)?'':'disabled'}>Cerrar mano</button></div>
+  ${g.ganador||fuera?'':'<button class="b3" data-a="aband">Abandonar partida</button>'}`;
 }
 let sel=null;const pref={ent:'',max:'4',lim:'100'};let cfg={comision:10,entradas:[500,1000,2000],turno:20,whatsapp:''};
 
@@ -266,7 +302,7 @@ document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a;
   if(a==='modo'){modo=b.dataset.v;err='';return view()}
   if(a==='salir')return signOut(auth);
-  if(['robar','tirar','cerrar','sig','reeng','cobrar','ready','sel','fin'].includes(a))return juego(a,b);
+  if(['robar','tirar','cerrar','sig','reeng','cobrar','ready','sel','fin','aband'].includes(a))return juego(a,b);
   err='';busy=true;view();
   try{
     const uref=doc(db,'users',U.uid),batch=writeBatch(db);
