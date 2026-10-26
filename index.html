@@ -84,6 +84,29 @@ button:focus-visible,.card:focus-visible{outline:3px solid #fff;outline-offset:2
 <script>
 const SUITS=['🟡','🏆','⚔️','🪵'],RK=[1,2,3,4,5,6,7,8,9,10,11,12],ENTRADA=500,COM=0.10;
 const COLORS=['#f2c14e','#5fd08a','#6aa9ff','#e8665a'];
+
+/* ---------- Sonidos (sin archivos: se generan en el navegador) ---------- */
+let ctxA=null,sonido=true;
+try{sonido=localStorage.getItem('snd')!=='0'}catch(e){}
+function audio(){
+  if(!ctxA){const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;ctxA=new C()}
+  if(ctxA.state==='suspended')ctxA.resume();return ctxA;
+}
+['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{audio()},{passive:true}));
+const SON={
+  inicio:[[523,0,.16],[659,.16,.16],[784,.32,.34]],
+  corte:[[392,0,.12,'triangle'],[392,.16,.12,'triangle'],[262,.34,.3,'triangle']],
+  gano:[[523,0,.14],[659,.14,.14],[784,.28,.14],[1047,.42,.55]],
+  perdio:[[392,0,.2,'triangle'],[330,.2,.2,'triangle'],[262,.4,.45,'triangle']],
+  turno:[[880,0,.12],[1175,.14,.28]]
+};
+function sonar(n,extra=0){
+  if(!sonido||!SON[n]||!ctxA||ctxA.state!=='running')return;const c=ctxA;
+  SON[n].forEach(([f,t,d,tp])=>{const o=c.createOscillator(),g=c.createGain(),t0=c.currentTime+t+extra;
+    o.type=tp||'sine';o.frequency.value=f;g.gain.setValueAtTime(0.0001,t0);g.gain.linearRampToValueAtTime(.2,t0+.02);g.gain.exponentialRampToValueAtTime(.001,t0+d);
+    o.connect(g);g.connect(c.destination);o.start(t0);o.stop(t0+d+.05)});
+}
+
 const $=s=>document.querySelector(s),fmt=n=>'$'+Math.round(n).toLocaleString('es-AR');
 let G,bank=5000;
 
@@ -141,11 +164,11 @@ function dealRound(){
   G.disc=[G.deck.pop()];
   G.dealer=nextActive(G.dealer);G.turn=nextActive(G.dealer);
   G.phase='draw';G.sel=null;G.newCard=null;
-  render();
+  render();sonar('inicio');if(G.turn===0)sonar('turno',1);
   if(G.players[G.turn].bot)setTimeout(botDraw,900);
 }
 function next(){
-  G.turn=nextActive(G.turn);G.phase='draw';G.sel=null;G.newCard=null;render();
+  G.turn=nextActive(G.turn);G.phase='draw';G.sel=null;G.newCard=null;render();if(G.turn===0)sonar('turno');
   if(G.players[G.turn].bot)setTimeout(botDraw,900);
 }
 function draw(from){
@@ -195,6 +218,7 @@ function endRound(closer,chin){
     foot=rej+`<button class="b1" onclick="dealRound()">Siguiente mano</button>`;
   }
   $('#ov').innerHTML=`<div class="box"><h2>${head}</h2>${body}${foot}</div>`;
+  sonar(over?(winner===G.players[0]?'gano':'perdio'):'corte');
   $('#ov').classList.add('on');
 }
 function rejoin(){

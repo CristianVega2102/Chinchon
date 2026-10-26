@@ -67,6 +67,46 @@ const auth=getAuth(app),db=getFirestore(app);
 const A=document.getElementById('app');
 const fmt=n=>'$'+Math.round(n).toLocaleString('es-AR');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+/* ---------- Sonidos (sin archivos: se generan en el navegador) ---------- */
+let ctxA=null,sonido=true;
+try{sonido=localStorage.getItem('snd')!=='0'}catch(e){}
+function audio(){
+  if(!ctxA){const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;ctxA=new C()}
+  if(ctxA.state==='suspended')ctxA.resume();return ctxA;
+}
+['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{audio()},{passive:true}));
+const SON={
+  inicio:[[523,0,.16],[659,.16,.16],[784,.32,.34]],
+  corte:[[392,0,.12,'triangle'],[392,.16,.12,'triangle'],[262,.34,.3,'triangle']],
+  gano:[[523,0,.14],[659,.14,.14],[784,.28,.14],[1047,.42,.55]],
+  perdio:[[392,0,.2,'triangle'],[330,.2,.2,'triangle'],[262,.4,.45,'triangle']],
+  turno:[[880,0,.12],[1175,.14,.28]]
+};
+function sonar(n,extra=0){
+  if(!sonido||!SON[n]||!ctxA||ctxA.state!=='running')return;const c=ctxA;
+  SON[n].forEach(([f,t,d,tp])=>{const o=c.createOscillator(),g=c.createGain(),t0=c.currentTime+t+extra;
+    o.type=tp||'sine';o.frequency.value=f;g.gain.setValueAtTime(0.0001,t0);g.gain.linearRampToValueAtTime(.2,t0+.02);g.gain.exponentialRampToValueAtTime(.001,t0+d);
+    o.connect(g);g.connect(c.destination);o.start(t0);o.stop(t0+d+.05)});
+}
+
+let prevS=null;
+function detectarSonidos(){
+  const m=mia;
+  if(!m){prevS=null;return}
+  if(m.estado!=='jugando'||!m.g){prevS={id:m.id,estado:m.estado};return}
+  const g=m.g,p=prevS&&prevS.id===m.id?prevS:null;
+  const mio=g.fase==='robar'&&g.orden[g.turno]===U.uid;
+  if(p){
+    let ev=null;
+    if(p.estado!=='jugando'||(p.fase==='resumen'&&g.fase==='robar'))ev='inicio';
+    else if(g.ganador&&!p.ganador)ev=g.ganador===U.uid?'gano':'perdio';
+    else if(p.fase!=='resumen'&&g.fase==='resumen')ev='corte';
+    if(ev)sonar(ev);
+    if(mio&&!p.mio)sonar('turno',ev==='inicio'?1:0);
+  }
+  prevS={id:m.id,estado:'jugando',fase:g.fase,ganador:g.ganador,mio};
+}
+
 /* ---------- Motor del Chinchón (cartas 0-39 = palo*10+posición, 40-41 = comodines) ---------- */
 const RK=[1,2,3,4,5,6,7,8,9,10,11,12],SU=['🟡','🏆','⚔️','🪵'],COL=['#f2c14e','#5fd08a','#6aa9ff','#e8665a'];
 const dc=n=>n>=48?{j:true,s:4,p:99,r:0}:{j:false,s:(n/12)|0,p:n%12,r:RK[n%12]};
@@ -241,7 +281,7 @@ onAuthStateChanged(auth,u=>{
     unsubs.push(onSnapshot(doc(db,'users',u.uid),s=>{me=s.exists()?s.data():null;view()}));
     unsubs.push(onSnapshot(query(collection(db,'mesas'),where('estado','in',['esperando','jugando'])),s=>{
       mesas=s.docs.map(d=>({id:d.id,...d.data()})).filter(m=>m.uids.length);
-      mia=mesas.find(m=>m.uids.includes(u.uid))||null;view();
+      mia=mesas.find(m=>m.uids.includes(u.uid))||null;detectarSonidos();view();
       if(mia&&mia.estado==='esperando'&&mia.uids.length===mia.max&&(mia.listos||[]).length===mia.max)autoIniciar();
     }));
   }
@@ -275,7 +315,7 @@ function cartel(t,p){
 }
 function head(){
   const msg=encodeURIComponent('Hola, quiero retirar el saldo (código '+U.uid.slice(0,6)+')');
-  return `<div class="bar"><h1>${esc(me.name)}</h1><div class="row"><span class="chip">${fmt(me.saldo)}</span><a class="chip" style="background:#2b2a14;color:var(--gold);text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${cfg.whatsapp||''}?text=${msg}">Retirar</a><button class="b3" data-a="salir">Salir</button></div></div>`}
+  return `<div class="bar"><h1>${esc(me.name)}</h1><div class="row"><span class="chip">${fmt(me.saldo)}</span><a class="chip" style="background:#2b2a14;color:var(--gold);text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${cfg.whatsapp||''}?text=${msg}">Retirar</a><button class="b3" data-a="snd" aria-label="Sonido">${sonido?'🔊':'🔇'}</button><button class="b3" data-a="salir">Salir</button></div></div>`}
 function lobbyView(){
   const ab=mesas.filter(m=>m.estado==='esperando');const list=ab.length?ab.map(m=>`<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="mono gold">${m.uids.length}/${m.max}</span></div>
     <div class="row"><span class="note">Mesa de ${m.max} · se elimina a los ${m.limite} puntos</span></div>
@@ -322,6 +362,7 @@ document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a;
   if(a==='modo'){modo=b.dataset.v;err='';return view()}
   if(a==='salir')return signOut(auth);
+  if(a==='snd'){sonido=!sonido;try{localStorage.setItem('snd',sonido?'1':'0')}catch(e){}if(sonido)sonar('inicio');return view()}
   if(['robar','tirar','cerrar','sig','reeng','cobrar','ready','sel','fin','aband'].includes(a))return juego(a,b);
   err='';busy=true;view();
   try{
