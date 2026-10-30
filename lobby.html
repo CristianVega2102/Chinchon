@@ -108,7 +108,7 @@ function detectarSonidos(){
 }
 
 /* ---------- Motor del Chinchón (cartas 0-39 = palo*10+posición, 40-41 = comodines) ---------- */
-const RK=[1,2,3,4,5,6,7,8,9,10,11,12],SU=['🟡','🏆','⚔️','🪵'],COL=['#f2c14e','#5fd08a','#6aa9ff','#e8665a'];
+const RK=[1,2,3,4,5,6,7,8,9,10,11,12],SU=['🟡','🏆','⚔️','🪾'],COL=['#f2c14e','#5fd08a','#6aa9ff','#e8665a'];
 const dc=n=>n>=48?{j:true,s:4,p:99,r:0}:{j:false,s:(n/12)|0,p:n%12,r:RK[n%12]};
 const pt=n=>{const c=dc(n);return c.j?25:c.r<=9?c.r:10};
 const ord=h=>h.slice().sort((a,b)=>a-b);
