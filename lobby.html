@@ -66,6 +66,7 @@ const app=initializeApp({
 const auth=getAuth(app),db=getFirestore(app);
 const A=document.getElementById('app');
 const fmt=n=>'$'+Math.round(n).toLocaleString('es-AR');
+const ent=n=>n?fmt(n):'GRATIS';
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 /* ---------- Sonidos (sin archivos: se generan en el navegador) ---------- */
 let ctxA=null,sonido=true;
@@ -257,7 +258,7 @@ function juegoView(){
       bt=`<h2>${R.chin?'¡CHINCHÓN! ':''}Ganó ${nom(gan)}</h2>`+(R.motivo?`<p class="note">${(R.quien||[]).map(nom).join(', ')} ${R.motivo==='tiempo'?'no tocó Listo a tiempo':'abandonó la partida'}.</p>`:'')+(g.pagado?`<button class="b1" data-a="fin">Volver al lobby</button>`:gan===u?`<button class="b1" data-a="cobrar" ${busy?'disabled':''}>Cobrar ${fmt(prize)}</button><p class="note">Pozo menos ${cfg.comision}% de comisión.</p>`:'<p class="note">Esperando que el ganador cobre el pozo.</p>');
     }else{const vr=g.venceReeng?Math.max(0,Math.ceil((g.venceReeng-Date.now())/1000)):0;
       const ven=vr>0?`<p class="note">${fuera?'Tenés':'Esperando un posible reenganche:'} <b id="cdre" class="mono gold">${vr}s</b>${fuera?' para reengancharte.':''}</p>`:'';
-      bt=`<h2>${nom(R.cerro)} cerró la mano</h2>`+ven+(fuera?`<button class="b2" data-a="reeng" ${busy||me.saldo<(m.reeng||m.entrada)?'disabled':''}>Reengancharse por ${fmt(m.reeng||m.entrada)}</button>`:'')+(fuera?'':`<p class="note">Tenés <b id="cdr" class="mono gold">${Math.max(0,Math.ceil((g.venceR-Date.now())/1000))}s</b> para tocar Listo, o perdés la partida.</p>`)+`<button class="b1" data-a="sig" ${busy||fuera||(g.listosR||{})[u]?'disabled':''}>${(g.listosR||{})[u]?'Esperando a los demás':'Listo para la siguiente mano'} (${Object.keys(g.listosR||{}).length}/${g.orden.filter(x=>!g.fuera[x]).length})</button>`;}
+      bt=`<h2>${nom(R.cerro)} cerró la mano</h2>`+ven+(fuera?`<button class="b2" data-a="reeng" ${busy||me.saldo<(m.reeng||m.entrada)?'disabled':''}>Reengancharse ${(m.reeng||m.entrada)?'por '+fmt(m.reeng||m.entrada):'gratis'}</button>`:'')+(fuera?'':`<p class="note">Tenés <b id="cdr" class="mono gold">${Math.max(0,Math.ceil((g.venceR-Date.now())/1000))}s</b> para tocar Listo, o perdés la partida.</p>`)+`<button class="b1" data-a="sig" ${busy||fuera||(g.listosR||{})[u]?'disabled':''}>${(g.listosR||{})[u]?'Esperando a los demás':'Listo para la siguiente mano'} (${Object.keys(g.listosR||{}).length}/${g.orden.filter(x=>!g.fuera[x]).length})</button>`;}
     res=`<div class="card">${bt}${filas}</div>`;
   }
   return `${head()}<div class="pozo"><span class="note">${esc(m.nombre)} · Entrada ${fmt(m.entrada)}</span><div style="text-align:right"><span class="note">Pozo</span><br><b>${fmt(m.pozo)}</b></div></div>
@@ -319,14 +320,14 @@ function head(){
 function lobbyView(){
   const ab=mesas.filter(m=>m.estado==='esperando');const list=ab.length?ab.map(m=>`<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="mono gold">${m.uids.length}/${m.max}</span></div>
     <div class="row"><span class="note">Mesa de ${m.max} · se elimina a los ${m.limite} puntos</span></div>
-    <div class="row"><span class="note">Entrada</span><span class="mono">${fmt(m.entrada)}</span></div>
+    <div class="row"><span class="note">Entrada</span><span class="mono">${ent(m.entrada)}</span></div>
     <div class="row"><span class="note">Pozo</span><span class="mono gold">${fmt(m.pozo)}</span></div>
     <button class="b2" data-a="unirse" data-id="${m.id}" ${busy||m.uids.length>=m.max||me.saldo<m.entrada?'disabled':''}>${me.saldo<m.entrada?'Saldo insuficiente':m.uids.length>=m.max?'Mesa llena':'Sentarme'}</button></div>`).join('')
     :'<p class="note">No hay mesas abiertas. Creá la primera.</p>';
   const wa=cfg.whatsapp?`<a class="b1" target="_blank" rel="noopener" href="https://wa.me/${cfg.whatsapp}?text=${encodeURIComponent('Hola, quiero cargar fichas. Mi usuario: '+me.name+' (código '+U.uid.slice(0,6)+')')}">Cargar saldo por WhatsApp</a>`:'';
   return `${head()}${wa}${me.admin?'<a class="b2" style="text-align:center;text-decoration:none;border-radius:14px;padding:13px;font-weight:800" href="admin.html">Panel de administrador</a>':''}
   ${me.saldo<Math.min(...cfg.entradas)?`<div class="card"><b>Tu saldo es ${fmt(me.saldo)}</b><p class="note">Para jugar tenés que cargar saldo. Usá el botón Cargar saldo por WhatsApp.</p></div>`:''}
-  <div class="card"><h2>Crear mesa</h2><select id="max" aria-label="Jugadores"><option value="4" ${pref.max==='4'?'selected':''}>4 jugadores</option><option value="3" ${pref.max==='3'?'selected':''}>3 jugadores</option><option value="2" ${pref.max==='2'?'selected':''}>2 jugadores</option></select><select id="lim" aria-label="Límite de puntos"><option value="100" ${pref.lim==='100'?'selected':''}>Se elimina a los 100 puntos</option><option value="50" ${pref.lim==='50'?'selected':''}>Se elimina a los 50 puntos</option></select><select id="ent" aria-label="Entrada">${cfg.entradas.map(n=>`<option value="${n}" ${String(n)===String(pref.ent)?'selected':''}>Entrada ${fmt(n)}</option>`).join('')}</select>
+  <div class="card"><h2>Crear mesa</h2><select id="max" aria-label="Jugadores"><option value="4" ${pref.max==='4'?'selected':''}>4 jugadores</option><option value="3" ${pref.max==='3'?'selected':''}>3 jugadores</option><option value="2" ${pref.max==='2'?'selected':''}>2 jugadores</option></select><select id="lim" aria-label="Límite de puntos"><option value="100" ${pref.lim==='100'?'selected':''}>Se elimina a los 100 puntos</option><option value="50" ${pref.lim==='50'?'selected':''}>Se elimina a los 50 puntos</option></select><select id="ent" aria-label="Entrada">${cfg.entradas.map(n=>`<option value="${n}" ${String(n)===String(pref.ent)?'selected':''}>Entrada ${fmt(n)}</option>`).join('')}<option value="0" ${pref.ent==='0'?'selected':''}>🎁 Mesa GRATIS de prueba</option></select>
   ${err?`<div class="err">${err}</div>`:''}<button class="b1" data-a="crear" ${busy?'disabled':''}>Crear y sentarme</button></div>
   <h2>Mesas abiertas</h2>${list}`;
 }
@@ -335,9 +336,9 @@ function salaView(){
   const seats=[...Array(m.max).keys()].map(i=>{const j=js[i];
     return j?`<div class="seat ${j.uid===U.uid?'me':''}"><div class="av">${esc(j.name[0].toUpperCase())}</div><b>${esc(j.name)}</b>${i===0?'<span class="tag">ANFITRIÓN</span>':''}<span class="tag" style="color:var(--ok)">${(m.listos||[]).includes(j.uid)?'Listo ✓':'Sentado'}</span></div>`
       :`<div class="seat empty"><div class="av">?</div><b>Buscando rival…</b><span class="tag">Puesto libre</span></div>`}).join('');
-  const txt=encodeURIComponent(`Te espero en ${m.nombre} de Chinchón. Entrada ${fmt(m.entrada)} en fichas: ${location.href}`);
+  const txt=encodeURIComponent(`Te espero en ${m.nombre} de Chinchón. Entrada ${ent(m.entrada)}${m.entrada?' en fichas':''}: ${location.href}`);
   return `${head()}<h1>${esc(m.nombre)}</h1><p class="note">Mesa de ${m.max} jugadores · se elimina a los ${m.limite} puntos</p>
-  <div class="pozo"><span class="note">Entrada ${fmt(m.entrada)}</span><div style="text-align:right"><span class="note">Pozo acumulado</span><br><b>${fmt(m.pozo)}</b></div></div>
+  <div class="pozo"><span class="note">Entrada ${ent(m.entrada)}</span><div style="text-align:right"><span class="note">Pozo acumulado</span><br><b>${fmt(m.pozo)}</b></div></div>
   <div class="card"><div class="row"><h2>${full?'Mesa completa':'Esperando jugadores…'}</h2><span class="mono gold">${js.length}/${m.max}</span></div></div>
   <div class="seats">${seats}</div>
   <button class="b1" data-a="ready" ${full&&!yaListo&&!busy?'':'disabled'}>${yaListo?`Esperando a los demás (${(m.listos||[]).length}/${m.max})`:'Estoy listo'}</button>
@@ -368,21 +369,21 @@ document.addEventListener('click',async e=>{
   try{
     const uref=doc(db,'users',U.uid),batch=writeBatch(db);
     if(a==='crear'){
-      const entrada=+pref.ent||cfg.entradas[0];
+      const entrada=pref.ent===''?cfg.entradas[0]:+pref.ent;
       if(me.saldo<entrada)throw{code:'permission-denied'};
       const r=doc(collection(db,'mesas'));
-      batch.set(r,{nombre:'Mesa #'+(100+Math.floor(Math.random()*900)),entrada,max:+pref.max,limite:+pref.lim,listos:[],reeng:cfg.reenganche>0?cfg.reenganche:entrada,pozo:entrada,anfitrion:U.uid,estado:'esperando',uids:[U.uid],jugadores:[{uid:U.uid,name:me.name}],creada:serverTimestamp()});
-      batch.update(uref,{saldo:increment(-entrada)});
+      batch.set(r,{nombre:'Mesa #'+(100+Math.floor(Math.random()*900)),entrada,max:+pref.max,limite:+pref.lim,listos:[],reeng:entrada===0?0:(cfg.reenganche>0?cfg.reenganche:entrada),pozo:entrada,anfitrion:U.uid,estado:'esperando',uids:[U.uid],jugadores:[{uid:U.uid,name:me.name}],creada:serverTimestamp()});
+      if(entrada>0)batch.update(uref,{saldo:increment(-entrada)});
     }
     if(a==='unirse'){
       const m=mesas.find(x=>x.id===b.dataset.id);
       batch.update(doc(db,'mesas',m.id),{uids:arrayUnion(U.uid),jugadores:arrayUnion({uid:U.uid,name:me.name}),pozo:increment(m.entrada),listos:[]});
-      batch.update(uref,{saldo:increment(-m.entrada)});
+      if(m.entrada>0)batch.update(uref,{saldo:increment(-m.entrada)});
     }
     if(a==='salirMesa'){
       const m=mia;
       batch.update(doc(db,'mesas',m.id),{uids:arrayRemove(U.uid),jugadores:arrayRemove(m.jugadores.find(j=>j.uid===U.uid)),pozo:increment(-m.entrada),listos:[]});
-      batch.update(uref,{saldo:increment(m.entrada),mesaSalida:m.id});
+      if(m.entrada>0)batch.update(uref,{saldo:increment(m.entrada),mesaSalida:m.id});
     }
     await batch.commit();busy=false;view();
   }catch(x){fail(x)}
