@@ -284,7 +284,7 @@ onAuthStateChanged(auth,u=>{
     unsubs.push(onSnapshot(doc(db,'config','general'),s=>{if(s.exists())cfg={...cfg,...s.data()};view()}));
     unsubs.push(onSnapshot(doc(db,'users',u.uid),s=>{me=s.exists()?s.data():null;view()}));
     unsubs.push(onSnapshot(query(collection(db,'mesas'),where('estado','in',['esperando','jugando'])),s=>{
-      mesas=s.docs.map(d=>({id:d.id,...d.data()})).filter(m=>m.uids.length);
+      mesas=s.docs.map(d=>({id:d.id,...d.data()})).filter(m=>m.uids.length||(m.entrada===0&&m.estado==='esperando'));
       mia=mesas.find(m=>m.uids.includes(u.uid))||null;detectarSonidos();view();
       if(mia&&mia.estado==='esperando'&&mia.uids.length===mia.max&&(mia.listos||[]).length===mia.max)autoIniciar();
     }));
@@ -325,7 +325,7 @@ function lobbyView(){
     <div class="row"><span class="note">Mesa de ${m.max} · se elimina a los ${m.limite} puntos</span></div>
     <div class="row"><span class="note">Entrada</span><span class="mono">${ent(m.entrada)}</span></div>
     <div class="row"><span class="note">Pozo</span><span class="mono gold">${fmt(m.pozo)}</span></div>
-    <button class="b2" data-a="unirse" data-id="${m.id}" ${busy||m.uids.length>=m.max||me.saldo<m.entrada?'disabled':''}>${me.saldo<m.entrada?'Saldo insuficiente':m.uids.length>=m.max?'Mesa llena':'Sentarme'}</button></div>`).join('')
+    <button class="b2" data-a="unirse" data-id="${m.id}" ${busy||m.uids.length>=m.max||me.saldo<m.entrada?'disabled':''}>${me.saldo<m.entrada?'Saldo insuficiente':m.uids.length>=m.max?'Mesa llena':'Sentarme'}</button>${me.admin&&m.entrada===0?`<button class="b2" data-a="borrar" data-id="${m.id}" ${busy?'disabled':''}>Eliminar mesa de prueba</button>`:''}</div>`).join('')
     :'<p class="note">No hay mesas abiertas. Creá la primera.</p>';
   const wa=cfg.whatsapp?`<a class="b1" target="_blank" rel="noopener" href="https://wa.me/${cfg.whatsapp}?text=${encodeURIComponent('Hola, quiero cargar fichas. Mi usuario: '+me.name+' (código '+U.uid.slice(0,6)+')')}">Cargar saldo por WhatsApp</a>`:'';
   return `${head()}${wa}${me.admin?'<a class="b2" style="text-align:center;text-decoration:none;border-radius:14px;padding:13px;font-weight:800" href="admin.html">Panel de administrador</a>':''}
@@ -375,9 +375,10 @@ document.addEventListener('click',async e=>{
       const entrada=pref.ent===''?cfg.entradas[0]:+pref.ent;
       if(me.saldo<entrada)throw{code:'permission-denied'};
       const r=doc(collection(db,'mesas'));
-      batch.set(r,{nombre:'Mesa #'+(100+Math.floor(Math.random()*900)),entrada,max:+pref.max,limite:+pref.lim,listos:[],reeng:entrada===0?0:(cfg.reenganche>0?cfg.reenganche:entrada),pozo:entrada,anfitrion:U.uid,estado:'esperando',uids:[U.uid],jugadores:[{uid:U.uid,name:me.name}],creada:serverTimestamp()});
+      batch.set(r,{nombre:'Mesa #'+(100+Math.floor(Math.random()*900)),entrada,max:+pref.max,limite:+pref.lim,listos:[],reeng:entrada===0?0:(cfg.reenganche>0?cfg.reenganche:entrada),pozo:entrada,anfitrion:U.uid,estado:'esperando',uids:entrada===0?[]:[U.uid],jugadores:entrada===0?[]:[{uid:U.uid,name:me.name}],creada:serverTimestamp()});
       if(entrada>0)batch.update(uref,{saldo:increment(-entrada)});
     }
+    if(a==='borrar'&&me.admin){batch.delete(doc(db,'mesas',b.dataset.id))}
     if(a==='unirse'){
       const m=mesas.find(x=>x.id===b.dataset.id);
       batch.update(doc(db,'mesas',m.id),{uids:arrayUnion(U.uid),jugadores:arrayUnion({uid:U.uid,name:me.name}),pozo:increment(m.entrada),listos:[]});
