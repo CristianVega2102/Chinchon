@@ -175,12 +175,20 @@ async function mover(fn){
   const ref=doc(db,'mesas',mia.id);
   await runTransaction(db,async t=>{const s=await t.get(ref);const d=s.data(),g=d.g;const x=fn(g,d,t);t.update(ref,{g,...(x||{})})});
 }
+const CUENTA=30,CUENTA_LLENA=10;
+const cuenta=m=>{const t=m.cuentaIni&&m.cuentaIni.toMillis?m.cuentaIni.toMillis():0;if(!t)return 999;const seg=m.uids.length>=m.max?CUENTA_LLENA:CUENTA;return Math.ceil((t+seg*1000-Date.now())/1000)};
+setInterval(()=>{
+  if(!U||!mia||mia.estado!=='esperando'||mia.uids.length<2)return;
+  const r=cuenta(mia),el=document.getElementById('cdw');
+  if(el)el.textContent=Math.max(0,r)+'s';
+  if(r<=0)autoIniciar();
+},1000);
 let iniciando=null;
 async function autoIniciar(){
   const m=mia;if(iniciando===m.id)return;iniciando=m.id;let hecho=false;
   try{const ref=doc(db,'mesas',m.id);
     await runTransaction(db,async t=>{const d=(await t.get(ref)).data();
-      if(d.estado!=='esperando'||d.uids.length<d.max||(d.listos||[]).length<d.max)return;
+      if(d.estado!=='esperando'||d.uids.length<2||cuenta(d)>0)return;
       t.update(ref,{estado:'jugando',g:armarG(d)});hecho=true});
   }catch(e){}
   if(!hecho)iniciando=null;
@@ -273,7 +281,7 @@ function juegoView(){
   <div class="acts"><button class="b2" data-a="tirar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy?'':'disabled'}>Descartar</button><button class="b1" data-a="cerrar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy&&canClose(yo,sel)?'':'disabled'}>Cerrar mano</button></div>
   ${g.ganador||fuera?'':'<button class="b3" data-a="aband">Abandonar partida</button>'}`;
 }
-let sel=null;const pref={ent:'',max:'4',lim:'100'};let cfg={comision:10,entradas:[500,1000,2000],turno:20,espera:40,reenganche:0,segReeng:20,whatsapp:''};
+let sel=null;const pref={ent:'',max:'4',lim:'100',sit:'si'};let cfg={comision:10,entradas:[500,1000,2000],turno:20,espera:40,reenganche:0,segReeng:20,whatsapp:''};
 
 let elim=false,U=null,me=null,mesas=[],mia=null,unsubs=[],modo='in',err='',busy=false;
 
@@ -284,9 +292,8 @@ onAuthStateChanged(auth,u=>{
     unsubs.push(onSnapshot(doc(db,'config','general'),s=>{if(s.exists())cfg={...cfg,...s.data()};view()}));
     unsubs.push(onSnapshot(doc(db,'users',u.uid),s=>{me=s.exists()?s.data():null;view()}));
     unsubs.push(onSnapshot(query(collection(db,'mesas'),where('estado','in',['esperando','jugando'])),s=>{
-      mesas=s.docs.map(d=>({id:d.id,...d.data()})).filter(m=>m.uids.length||(m.entrada===0&&m.estado==='esperando'));
+      mesas=s.docs.map(d=>({id:d.id,...d.data({serverTimestamps:'estimate'})})).filter(m=>m.uids.length||(m.estado==='esperando'&&(m.fija||m.entrada===0)));
       mia=mesas.find(m=>m.uids.includes(u.uid))||null;detectarSonidos();view();
-      if(mia&&mia.estado==='esperando'&&mia.uids.length===mia.max&&(mia.listos||[]).length===mia.max)autoIniciar();
     }));
   }
   view();
@@ -322,35 +329,34 @@ function head(){
   return `<div class="bar"><h1>${esc(me.name)}</h1><div class="row"><span class="chip">${fmt(me.saldo)}</span><a class="chip" style="background:#2b2a14;color:var(--gold);text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${cfg.whatsapp||''}?text=${msg}">Retirar</a><button class="b3" data-a="snd" aria-label="Sonido">${sonido?'🔊':'🔇'}</button><button class="b3" data-a="salir">Salir</button></div></div>`}
 function lobbyView(){
   const ab=mesas.filter(m=>m.estado==='esperando');const list=ab.length?ab.map(m=>`<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="mono gold">${m.uids.length}/${m.max}</span></div>
-    <div class="row"><span class="note">Mesa de ${m.max} · se elimina a los ${m.limite} puntos</span></div>
+    <div class="row"><span class="note">Mesa de hasta ${m.max} · se elimina a los ${m.limite} puntos</span></div>
     <div class="row"><span class="note">Entrada</span><span class="mono">${ent(m.entrada)}</span></div>
     <div class="row"><span class="note">Pozo</span><span class="mono gold">${fmt(m.pozo)}</span></div>
-    <button class="b2" data-a="unirse" data-id="${m.id}" ${busy||m.uids.length>=m.max||me.saldo<m.entrada?'disabled':''}>${me.saldo<m.entrada?'Saldo insuficiente':m.uids.length>=m.max?'Mesa llena':'Sentarme'}</button>${me.admin&&m.entrada===0?`<button class="b2" data-a="borrar" data-id="${m.id}" ${busy?'disabled':''}>Eliminar mesa de prueba</button>`:''}</div>`).join('')
+    <button class="b2" data-a="unirse" data-id="${m.id}" ${busy||m.uids.length>=m.max||me.saldo<m.entrada?'disabled':''}>${me.saldo<m.entrada?'Saldo insuficiente':m.uids.length>=m.max?'Mesa llena':'Sentarme'}</button>${me.admin?`<button class="b2" data-a="borrar" data-id="${m.id}" ${busy?'disabled':''}>Eliminar mesa${m.entrada&&m.uids.length?' (devuelve las entradas)':''}</button>`:''}</div>`).join('')
     :'<p class="note">No hay mesas abiertas. Creá la primera.</p>';
   const wa=cfg.whatsapp?`<a class="b1" target="_blank" rel="noopener" href="https://wa.me/${cfg.whatsapp}?text=${encodeURIComponent('Hola, quiero cargar fichas. Mi usuario: '+me.name+' (código '+U.uid.slice(0,6)+')')}">Cargar saldo por WhatsApp</a>`:'';
   return `${head()}${wa}${me.admin?'<a class="b2" style="text-align:center;text-decoration:none;border-radius:14px;padding:13px;font-weight:800" href="admin.html">Panel de administrador</a>':''}
   ${me.saldo<Math.min(...cfg.entradas)?`<div class="card"><b>Tu saldo es ${fmt(me.saldo)}</b><p class="note">Para jugar tenés que cargar saldo. Usá el botón Cargar saldo por WhatsApp.</p></div>`:''}
-  <div class="card"><h2>Crear mesa</h2><select id="max" aria-label="Jugadores"><option value="4" ${pref.max==='4'?'selected':''}>4 jugadores</option><option value="3" ${pref.max==='3'?'selected':''}>3 jugadores</option><option value="2" ${pref.max==='2'?'selected':''}>2 jugadores</option></select><select id="lim" aria-label="Límite de puntos"><option value="100" ${pref.lim==='100'?'selected':''}>Se elimina a los 100 puntos</option><option value="50" ${pref.lim==='50'?'selected':''}>Se elimina a los 50 puntos</option></select><select id="ent" aria-label="Entrada">${cfg.entradas.map(n=>`<option value="${n}" ${String(n)===String(pref.ent)?'selected':''}>Entrada ${fmt(n)}</option>`).join('')}${me.admin?'<option value="0" '+(pref.ent==='0'?'selected':'')+'>🎁 Mesa GRATIS de prueba (solo admin)</option>':''}</select>
-  ${err?`<div class="err">${err}</div>`:''}<button class="b1" data-a="crear" ${busy?'disabled':''}>Crear y sentarme</button></div>
+  <div class="card"><h2>Crear mesa</h2><select id="max" aria-label="Jugadores"><option value="6" ${pref.max==='6'?'selected':''}>6 jugadores</option><option value="5" ${pref.max==='5'?'selected':''}>5 jugadores</option><option value="4" ${pref.max==='4'?'selected':''}>4 jugadores</option><option value="3" ${pref.max==='3'?'selected':''}>3 jugadores</option><option value="2" ${pref.max==='2'?'selected':''}>2 jugadores</option></select><select id="lim" aria-label="Límite de puntos"><option value="100" ${pref.lim==='100'?'selected':''}>Se elimina a los 100 puntos</option><option value="50" ${pref.lim==='50'?'selected':''}>Se elimina a los 50 puntos</option></select><select id="ent" aria-label="Entrada">${cfg.entradas.map(n=>`<option value="${n}" ${String(n)===String(pref.ent)?'selected':''}>Entrada ${fmt(n)}</option>`).join('')}${me.admin?'<option value="0" '+(pref.ent==='0'?'selected':'')+'>🎁 Mesa GRATIS de prueba (solo admin)</option>':''}</select>${me.admin?`<select id="sit" aria-label="Sentarme"><option value="si" ${pref.sit==='si'?'selected':''}>Me siento en la mesa</option><option value="no" ${pref.sit==='no'?'selected':''}>No me siento (mesa para los usuarios)</option></select>`:''}
+  ${err?`<div class="err">${err}</div>`:''}<button class="b1" data-a="crear" ${busy?'disabled':''}>Crear mesa</button></div>
   <h2>Mesas abiertas</h2>${list}`;
 }
 function salaView(){
   const m=mia,js=m.jugadores,full=js.length===m.max,yaListo=(m.listos||[]).includes(U.uid);
   const seats=[...Array(m.max).keys()].map(i=>{const j=js[i];
-    return j?`<div class="seat ${j.uid===U.uid?'me':''}"><div class="av">${esc(j.name[0].toUpperCase())}</div><b>${esc(j.name)}</b>${i===0?'<span class="tag">ANFITRIÓN</span>':''}<span class="tag" style="color:var(--ok)">${(m.listos||[]).includes(j.uid)?'Listo ✓':'Sentado'}</span></div>`
+    return j?`<div class="seat ${j.uid===U.uid?'me':''}"><div class="av">${esc(j.name[0].toUpperCase())}</div><b>${esc(j.name)}</b>${j.uid===m.anfitrion?'<span class="tag">ANFITRIÓN</span>':''}<span class="tag" style="color:var(--ok)">Sentado</span></div>`
       :`<div class="seat empty"><div class="av">?</div><b>Buscando rival…</b><span class="tag">Puesto libre</span></div>`}).join('');
   const txt=encodeURIComponent(`Te espero en ${m.nombre} de Chinchón. Entrada ${ent(m.entrada)}${m.entrada?' en fichas':''}: ${location.href}`);
-  return `${head()}<h1>${esc(m.nombre)}</h1><p class="note">Mesa de ${m.max} jugadores · se elimina a los ${m.limite} puntos</p>
+  return `${head()}<h1>${esc(m.nombre)}</h1><p class="note">Mesa de hasta ${m.max} jugadores · se elimina a los ${m.limite} puntos</p>
   <div class="pozo"><span class="note">Entrada ${ent(m.entrada)}</span><div style="text-align:right"><span class="note">Pozo acumulado</span><br><b>${fmt(m.pozo)}</b></div></div>
-  <div class="card"><div class="row"><h2>${full?'Mesa completa':'Esperando jugadores…'}</h2><span class="mono gold">${js.length}/${m.max}</span></div></div>
+  <div class="card"><div class="row"><h2>Jugadores</h2><span class="mono gold">${js.length}/${m.max}</span></div></div>
   <div class="seats">${seats}</div>
-  <button class="b1" data-a="ready" ${full&&!yaListo&&!busy?'':'disabled'}>${yaListo?`Esperando a los demás (${(m.listos||[]).length}/${m.max})`:'Estoy listo'}</button>
-  <p class="note">${full?'La partida empieza cuando todos toquen Estoy listo.':`Se necesitan ${m.max} jugadores para empezar.`}</p>${err?`<div class="err">${err}</div>`:''}
+  <div class="card" style="text-align:center">${js.length>=2?`<h2>La partida empieza en <span id="cdw" class="mono gold">${Math.max(0,cuenta(m))}s</span></h2><p class="note">${full?'Mesa completa.':'Si entra otro jugador, la cuenta vuelve a empezar.'}</p>`:'<h2>Esperando jugadores…</h2><p class="note">Con 2 jugadores arranca la cuenta regresiva.</p>'}</div>${err?`<div class="err">${err}</div>`:''}
   <a class="b1" href="https://wa.me/?text=${txt}" target="_blank" rel="noopener">Invitar amigo por WhatsApp</a>
   <button class="b2" data-a="salirMesa" ${busy?'disabled':''}>Salir de la mesa (te devolvemos la entrada)</button>`;
 }
 
-document.addEventListener('change',e=>{const k={ent:'ent',max:'max',lim:'lim'}[e.target.id];if(k)pref[k]=e.target.value});
+document.addEventListener('change',e=>{const k={ent:'ent',max:'max',lim:'lim',sit:'sit'}[e.target.id];if(k)pref[k]=e.target.value});
 document.addEventListener('submit',async e=>{
   if(e.target.id!=='f')return;e.preventDefault();
   const f=new FormData(e.target);err='';busy=true;view();
@@ -368,25 +374,27 @@ document.addEventListener('click',async e=>{
   if(a==='salir')return signOut(auth);
   if(a==='snd'){sonido=!sonido;try{localStorage.setItem('snd',sonido?'1':'0')}catch(e){}if(sonido)sonar('inicio');return view()}
   if(['robar','tirar','cerrar','sig','reeng','cobrar','ready','sel','fin','aband'].includes(a))return juego(a,b);
+  if(a==='borrar'&&!confirm('¿Eliminar esta mesa?'))return;
   err='';busy=true;view();
   try{
     const uref=doc(db,'users',U.uid),batch=writeBatch(db);
     if(a==='crear'){
       const entrada=pref.ent===''?cfg.entradas[0]:+pref.ent;
-      if(me.saldo<entrada)throw{code:'permission-denied'};
+      const sento=!(me.admin&&pref.sit==='no');
+      if(sento&&me.saldo<entrada)throw{code:'permission-denied'};
       const r=doc(collection(db,'mesas'));
-      batch.set(r,{nombre:'Mesa #'+(100+Math.floor(Math.random()*900)),entrada,max:+pref.max,limite:+pref.lim,listos:[],reeng:entrada===0?0:(cfg.reenganche>0?cfg.reenganche:entrada),pozo:entrada,anfitrion:U.uid,estado:'esperando',uids:entrada===0?[]:[U.uid],jugadores:entrada===0?[]:[{uid:U.uid,name:me.name}],creada:serverTimestamp()});
-      if(entrada>0)batch.update(uref,{saldo:increment(-entrada)});
+      batch.set(r,{nombre:'Mesa #'+(100+Math.floor(Math.random()*900)),entrada,max:+pref.max,limite:+pref.lim,listos:[],reeng:entrada===0?0:(cfg.reenganche>0?cfg.reenganche:entrada),pozo:sento?entrada:0,fija:!sento,anfitrion:U.uid,cuentaIni:serverTimestamp(),estado:'esperando',uids:sento?[U.uid]:[],jugadores:sento?[{uid:U.uid,name:me.name}]:[],creada:serverTimestamp()});
+      if(sento&&entrada>0)batch.update(uref,{saldo:increment(-entrada)});
     }
-    if(a==='borrar'&&me.admin){batch.delete(doc(db,'mesas',b.dataset.id))}
+    if(a==='borrar'&&me.admin){const m=mesas.find(x=>x.id===b.dataset.id);if(m){batch.delete(doc(db,'mesas',m.id));if(m.entrada>0)m.uids.forEach(u=>batch.update(doc(db,'users',u),{saldo:increment(m.entrada)}))}}
     if(a==='unirse'){
       const m=mesas.find(x=>x.id===b.dataset.id);
-      batch.update(doc(db,'mesas',m.id),{uids:arrayUnion(U.uid),jugadores:arrayUnion({uid:U.uid,name:me.name}),pozo:increment(m.entrada),listos:[]});
+      batch.update(doc(db,'mesas',m.id),{uids:arrayUnion(U.uid),jugadores:arrayUnion({uid:U.uid,name:me.name}),pozo:increment(m.entrada),listos:[],cuentaIni:serverTimestamp()});
       if(m.entrada>0)batch.update(uref,{saldo:increment(-m.entrada)});
     }
     if(a==='salirMesa'){
       const m=mia;
-      batch.update(doc(db,'mesas',m.id),{uids:arrayRemove(U.uid),jugadores:arrayRemove(m.jugadores.find(j=>j.uid===U.uid)),pozo:increment(-m.entrada),listos:[]});
+      batch.update(doc(db,'mesas',m.id),{uids:arrayRemove(U.uid),jugadores:arrayRemove(m.jugadores.find(j=>j.uid===U.uid)),pozo:increment(-m.entrada),listos:[],cuentaIni:serverTimestamp()});
       if(m.entrada>0)batch.update(uref,{saldo:increment(m.entrada),mesaSalida:m.id});
     }
     await batch.commit();busy=false;view();
