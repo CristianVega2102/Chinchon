@@ -34,8 +34,10 @@ a.b1{text-decoration:none;text-align:center;display:block;border-radius:14px;pad
 
 .gc{position:relative;flex:1;max-width:58px;aspect-ratio:5/7;border-radius:8px;background:#f4ecd8;color:#222;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;border:2px solid #d9cba6;font-size:clamp(14px,4.6vw,20px);cursor:pointer;user-select:none}
 .gc.s0{color:#9a6b00}.gc.s1{color:#b3261e}.gc.s2{color:#1f4e8c}.gc.s3{color:#2e6b34}
+.gc.img{background-size:100% 100%;background-position:center;background-repeat:no-repeat;border-color:#d9cba6}
+.gc.back{background-image:url(cartas/dorso.jpg);background-size:100% 100%;background-color:#1d3a2c}
 .gc.jk{background:#3b2a5c;color:#f2c14e;border-color:#5a4690;font-size:10px}
-.gc.back{background:repeating-linear-gradient(45deg,#1d3a2c,#1d3a2c 6px,#24493a 6px,#24493a 12px);border-color:#2f5c48}
+.gc.back{border-color:#2f5c48}
 .gc.sel{transform:translateY(-12px);border-color:var(--gold);box-shadow:0 0 0 2px var(--gold)}
 .gc.go{box-shadow:0 0 0 2px var(--gold)}
 .gc.nw::before{content:'';position:absolute;top:3px;right:3px;width:7px;height:7px;border-radius:50%;background:var(--gold)}
@@ -239,7 +241,8 @@ async function juego(a,b){
     sel=null;busy=false;view();
   }catch(x){fail(x)}
 }
-const gcard=(n,x='',at='')=>{const c=dc(n);return c.j?`<div class="gc jk ${x}" ${at}>🃏<span>JOKER</span></div>`:`<div class="gc s${c.s} ${x}" ${at}><span>${c.r}</span><span>${SU[c.s]}</span></div>`};
+const PALO=['oro','copa','espada','basto'];
+const gcard=(n,x='',at='')=>{const c=dc(n);const u=c.j?'cartas/comodin.jpg':`cartas/${PALO[c.s]}-${c.r}.jpg`;return `<div class="gc img ${c.j?'':'s'+c.s} ${x}" style="background-image:url(${u})" ${at}></div>`};
 const mini=n=>{const c=dc(n);return `<span class="mc ${c.j?'j':''}">${c.j?'🃏':c.r+SU[c.s]}</span>`};
 function juegoView(){
   const m=mia,g=m.g,u=U.uid,yo=g.manos[u]||[],mi=g.orden[g.turno]===u&&g.fase!=='resumen',fuera=!!g.fuera[u];
