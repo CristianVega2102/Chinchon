@@ -69,6 +69,7 @@ const auth=getAuth(app),db=getFirestore(app);
 const A=document.getElementById('app');
 const fmt=n=>'$'+Math.round(n).toLocaleString('es-AR');
 const ent=n=>n?fmt(n):'GRATIS';
+const neto=p=>Math.floor(p*(100-cfg.comision)/100);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 /* ---------- Sonidos (sin archivos: se generan en el navegador) ---------- */
 let ctxA=null,sonido=true;
@@ -265,14 +266,14 @@ function juegoView(){
     const R=g.res,gan=g.ganador;
     const filas=R.filas.map(f=>`<div class="card" style="padding:10px"><div class="row"><b>${nom(f.uid)}${g.fuera[f.uid]?' · eliminado':''}</b><span class="mono" style="color:${f.add>0?'var(--bad)':'var(--ok)'}">${f.add>0?'+':''}${f.add} → ${f.total}</span></div>${(()=>{const d=desglose(f.mano);return `<div class="mcs">${d.grupos.map(gr=>`<span class="grp">${gr.map(mini).join('')}</span>`).join('')}</div>`+(d.sueltas.length?`<div class="mcs"><span class="note">Suman ${d.pts}:</span>${d.sueltas.map(mini).join('')}</div>`:'<div class="note">Todas combinadas</div>')})()}</div>`).join('');
     let bt='';
-    if(gan){const prize=Math.floor(m.pozo*(100-cfg.comision)/100);
-      bt=`<h2>${R.chin?'¡CHINCHÓN! ':''}Ganó ${nom(gan)}</h2>`+(R.motivo?`<p class="note">${(R.quien||[]).map(nom).join(', ')} ${R.motivo==='tiempo'?'no tocó Listo a tiempo':'abandonó la partida'}.</p>`:'')+(g.pagado?`<button class="b1" data-a="fin">Volver al lobby</button>`:gan===u?`<button class="b1" data-a="cobrar" ${busy?'disabled':''}>Cobrar ${fmt(prize)}</button><p class="note">Pozo menos ${cfg.comision}% de comisión.</p>`:'<p class="note">Esperando que el ganador cobre el pozo.</p>');
+    if(gan){const prize=neto(m.pozo);
+      bt=`<h2>${R.chin?'¡CHINCHÓN! ':''}Ganó ${nom(gan)}</h2>`+(R.motivo?`<p class="note">${(R.quien||[]).map(nom).join(', ')} ${R.motivo==='tiempo'?'no tocó Listo a tiempo':'abandonó la partida'}.</p>`:'')+(g.pagado?`<button class="b1" data-a="fin">Volver al lobby</button>`:gan===u?`<button class="b1" data-a="cobrar" ${busy?'disabled':''}>Cobrar ${fmt(prize)}</button>`:'<p class="note">Esperando que el ganador cobre el pozo.</p>');
     }else{const vr=g.venceReeng?Math.max(0,Math.ceil((g.venceReeng-Date.now())/1000)):0;
       const ven=vr>0?`<p class="note">${fuera?'Tenés':'Esperando un posible reenganche:'} <b id="cdre" class="mono gold">${vr}s</b>${fuera?' para reengancharte.':''}</p>`:'';
       bt=`<h2>${nom(R.cerro)} cerró la mano</h2>`+ven+(fuera?`<button class="b2" data-a="reeng" ${busy||me.saldo<(m.reeng||m.entrada)?'disabled':''}>Reengancharse ${(m.reeng||m.entrada)?'por '+fmt(m.reeng||m.entrada):'gratis'}</button>`:'')+(fuera?'':`<p class="note">Tenés <b id="cdr" class="mono gold">${Math.max(0,Math.ceil((g.venceR-Date.now())/1000))}s</b> para tocar Listo, o perdés la partida.</p>`)+`<button class="b1" data-a="sig" ${busy||fuera||(g.listosR||{})[u]?'disabled':''}>${(g.listosR||{})[u]?'Esperando a los demás':'Listo para la siguiente mano'} (${Object.keys(g.listosR||{}).length}/${g.orden.filter(x=>!g.fuera[x]).length})</button>`;}
     res=`<div class="card">${bt}${filas}</div>`;
   }
-  return `${head()}<div class="pozo"><span class="note">${esc(m.nombre)} · Entrada ${fmt(m.entrada)}</span><div style="text-align:right"><span class="note">Pozo</span><br><b>${fmt(m.pozo)}</b></div></div>
+  return `${head()}<div class="pozo"><span class="note">${esc(m.nombre)} · Entrada ${fmt(m.entrada)}</span><div style="text-align:right"><span class="note">Pozo</span><br><b>${fmt(neto(m.pozo))}</b></div></div>
   <div style="display:grid;grid-template-columns:repeat(${g.orden.length-1},1fr);gap:8px">${ops}</div>
   <div class="card"><div class="row" style="justify-content:center"><b>${msg}</b>${g.fase==='resumen'?'':`<span id="cd" class="mono gold">${Math.max(0,Math.ceil((g.vence-Date.now())/1000))}s</span>`}</div>${err?`<div class="err">${err}</div>`:''}
     <div class="piles"><div class="gc back ${mi&&g.fase==='robar'?'go':''}" data-a="robar" data-f="mazo" role="button" tabindex="0" aria-label="Sacar del mazo"></div>${gcard(top,mi&&g.fase==='robar'?'go':'',`data-a="robar" data-f="desc" role="button" tabindex="0" aria-label="Levantar del descarte"`)}</div>
@@ -331,7 +332,7 @@ function lobbyView(){
   const ab=mesas.filter(m=>m.estado==='esperando');const list=ab.length?ab.map(m=>`<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="mono gold">${m.uids.length}/${m.max}</span></div>
     <div class="row"><span class="note">Mesa de hasta ${m.max} · se elimina a los ${m.limite} puntos</span></div>
     <div class="row"><span class="note">Entrada</span><span class="mono">${ent(m.entrada)}</span></div>
-    <div class="row"><span class="note">Pozo</span><span class="mono gold">${fmt(m.pozo)}</span></div>
+    <div class="row"><span class="note">Pozo</span><span class="mono gold">${fmt(neto(m.pozo))}</span></div>
     <button class="b2" data-a="unirse" data-id="${m.id}" ${busy||m.uids.length>=m.max||me.saldo<m.entrada?'disabled':''}>${me.saldo<m.entrada?'Saldo insuficiente':m.uids.length>=m.max?'Mesa llena':'Sentarme'}</button>${me.admin?`<button class="b2" data-a="borrar" data-id="${m.id}" ${busy?'disabled':''}>Eliminar mesa${m.entrada&&m.uids.length?' (devuelve las entradas)':''}</button>`:''}</div>`).join('')
     :'<p class="note">No hay mesas abiertas. Creá la primera.</p>';
   const wa=cfg.whatsapp?`<a class="b1" target="_blank" rel="noopener" href="https://wa.me/${cfg.whatsapp}?text=${encodeURIComponent('Hola, quiero cargar fichas. Mi usuario: '+me.name+' (código '+U.uid.slice(0,6)+')')}">Cargar saldo por WhatsApp</a>`:'';
@@ -348,7 +349,7 @@ function salaView(){
       :`<div class="seat empty"><div class="av">?</div><b>Buscando rival…</b><span class="tag">Puesto libre</span></div>`}).join('');
   const txt=encodeURIComponent(`Te espero en ${m.nombre} de Chinchón. Entrada ${ent(m.entrada)}${m.entrada?' en fichas':''}: ${location.href}`);
   return `${head()}<h1>${esc(m.nombre)}</h1><p class="note">Mesa de hasta ${m.max} jugadores · se elimina a los ${m.limite} puntos</p>
-  <div class="pozo"><span class="note">Entrada ${ent(m.entrada)}</span><div style="text-align:right"><span class="note">Pozo acumulado</span><br><b>${fmt(m.pozo)}</b></div></div>
+  <div class="pozo"><span class="note">Entrada ${ent(m.entrada)}</span><div style="text-align:right"><span class="note">Pozo acumulado</span><br><b>${fmt(neto(m.pozo))}</b></div></div>
   <div class="card"><div class="row"><h2>Jugadores</h2><span class="mono gold">${js.length}/${m.max}</span></div></div>
   <div class="seats">${seats}</div>
   <div class="card" style="text-align:center">${js.length>=2?`<h2>La partida empieza en <span id="cdw" class="mono gold">${Math.max(0,cuenta(m))}s</span></h2><p class="note">${full?'Mesa completa.':'Si entra otro jugador, la cuenta vuelve a empezar.'}</p>`:'<h2>Esperando jugadores…</h2><p class="note">Con 2 jugadores arranca la cuenta regresiva.</p>'}</div>${err?`<div class="err">${err}</div>`:''}
