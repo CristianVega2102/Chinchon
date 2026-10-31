@@ -43,7 +43,7 @@ a.b1{text-decoration:none;text-align:center;display:block;border-radius:14px;pad
 .gc.nw::before{content:'';position:absolute;top:3px;right:3px;width:7px;height:7px;border-radius:50%;background:var(--gold)}
 .gc i{position:absolute;left:3px;right:3px;bottom:3px;height:4px;border-radius:2px}
 .hand{display:flex;gap:4px;justify-content:center;padding-top:14px}
-.piles{display:flex;gap:22px;justify-content:center}.piles .gc{width:92px;flex:none}
+.piles{display:flex;gap:22px;justify-content:center}.piles .gc{width:104px;max-width:104px;flex:none}
 .mcs{display:flex;flex-wrap:wrap;gap:3px}.mc{font-family:var(--mono);font-size:12px;background:#f4ecd8;color:#222;border-radius:4px;padding:2px 4px;font-weight:700}.mc.j{background:#3b2a5c;color:var(--gold)}
 .acts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .hand .gc{max-width:94px;font-size:clamp(17px,5.4vw,26px)}.gc.sel{transform:translateY(-6px)}
@@ -184,6 +184,9 @@ setInterval(()=>{
   if(el)el.textContent=Math.max(0,r)+'s';
   if(r<=0)autoIniciar();
 },1000);
+let dej=new Set();try{dej=new Set(JSON.parse(localStorage.getItem('dej')||'[]'))}catch(e){}
+const buscarMia=()=>mesas.find(m=>m.uids.includes(U.uid)&&!dej.has(m.id))||null;
+function dejar(id){dej.add(id);try{localStorage.setItem('dej',JSON.stringify([...dej].slice(-30)))}catch(e){}mia=buscarMia();sel=null;err='';view()}
 let iniciando=null;
 async function autoIniciar(){
   const m=mia;if(iniciando===m.id)return;iniciando=m.id;let hecho=false;
@@ -219,6 +222,7 @@ setInterval(()=>{
 },1000);
 async function juego(a,b){
   if(a==='sel'){sel=+b.dataset.c;return view()}
+  if(a==='volver'){if(mia)dejar(mia.id);return}
   if(a==='aband'&&!confirm('Si abandonás, perdés la partida y el pozo. ¿Seguro?'))return;
   busy=true;err='';view();
   const u=U.uid,m=mia,uref=doc(db,'users',u);
@@ -256,7 +260,7 @@ const mini=n=>{const c=dc(n);return `<span class="mc ${c.j?'j':''}">${c.j?'🃏'
 function juegoView(){
   const m=mia,g=m.g,u=U.uid,yo=g.manos[u]||[],mi=g.orden[g.turno]===u&&g.fase!=='resumen',fuera=!!g.fuera[u];
   const nom=x=>esc(g.nombres[x]);
-  const ops=[u,...g.orden.filter(x=>x!==u)].map(x=>`<div class="seat ${g.orden[g.turno]===x&&g.fase!=='resumen'?'me':''}" style="min-height:0;padding:10px 4px;${g.fuera[x]?'opacity:.45':''}"><div class="av" style="width:40px;height:40px;font-size:16px">${esc(g.nombres[x][0].toUpperCase())}</div><b style="font-size:13px">${x===u?'Vos':nom(x)}</b><span class="mono gold" style="font-size:22px;font-weight:800;line-height:1.1">${g.puntos[x]}<small style="font-size:11px;font-weight:600"> pts</small></span>${g.fuera[x]?'<span class="tag">Eliminado</span>':''}</div>`).join('');
+  const ops=[u,...g.orden.filter(x=>x!==u)].map(x=>`<div class="seat ${g.orden[g.turno]===x&&g.fase!=='resumen'?'me':''}" style="min-height:0;padding:10px 4px;${g.fuera[x]?'opacity:.45':''}"><div class="av" style="width:40px;height:40px;font-size:16px">${esc(g.nombres[x][0].toUpperCase())}</div><b style="font-size:13px">${x===u?'Vos':nom(x)}</b><span class="mono gold" style="font-size:22px;font-weight:800;line-height:1.1">${g.puntos[x]}<small style="font-size:13px;font-weight:600">/${g.limite}</small></span>${g.fuera[x]?'<span class="tag">Eliminado</span>':''}</div>`).join('');
   const msg=g.fase==='resumen'?'Fin de la mano':fuera?'Estás eliminado. Podés mirar la partida.':mi?(g.fase==='robar'?'Tu turno: sacá del mazo o del descarte':'Elegí una carta para descartar o cerrar'):'Juega '+nom(g.orden[g.turno])+'…';
   const top=g.desc[g.desc.length-1],OR=ordenar(yo),mk=OR.col;
   const hs=fuera?[]:OR.cartas.map(n=>gcard(n,(sel===n?'sel ':'')+(g.nuevo===n?'nw':''),`data-a="sel" data-c="${n}" role="button" tabindex="0"`).replace(/<\/div>$/,mk[n]?`<i style="background:${mk[n]}"></i></div>`:'</div>'));
@@ -267,7 +271,7 @@ function juegoView(){
     const filas=R.filas.map(f=>`<div class="card" style="padding:10px"><div class="row"><b>${nom(f.uid)}${g.fuera[f.uid]?' · eliminado':''}</b><span class="mono" style="color:${f.add>0?'var(--bad)':'var(--ok)'}">${f.add>0?'+':''}${f.add} → ${f.total}</span></div>${(()=>{const d=desglose(f.mano);return `<div class="mcs">${d.grupos.map(gr=>`<span class="grp">${gr.map(mini).join('')}</span>`).join('')}</div>`+(d.sueltas.length?`<div class="mcs"><span class="note">Suman ${d.pts}:</span>${d.sueltas.map(mini).join('')}</div>`:'<div class="note">Todas combinadas</div>')})()}</div>`).join('');
     let bt='';
     if(gan){const prize=neto(m.pozo);
-      bt=`<h2>${R.chin?'¡CHINCHÓN! ':''}Ganó ${nom(gan)}</h2>`+(R.motivo?`<p class="note">${(R.quien||[]).map(nom).join(', ')} ${R.motivo==='tiempo'?'no tocó Listo a tiempo':'abandonó la partida'}.</p>`:'')+(g.pagado?`<button class="b1" data-a="fin">Volver al lobby</button>`:gan===u?`<button class="b1" data-a="cobrar" ${busy?'disabled':''}>Cobrar ${fmt(prize)}</button>`:'<p class="note">Esperando que el ganador cobre el pozo.</p>');
+      bt=`<h2>${R.chin?'¡CHINCHÓN! ':''}Ganó ${nom(gan)}</h2>`+(R.motivo?`<p class="note">${(R.quien||[]).map(nom).join(', ')} ${R.motivo==='tiempo'?'no tocó Listo a tiempo':'abandonó la partida'}.</p>`:'')+(g.pagado?`<button class="b1" data-a="fin">Volver al lobby</button>`:gan===u?`<button class="b1" data-a="cobrar" ${busy?'disabled':''}>Cobrar ${fmt(prize)}</button>`:`<button class="b1" data-a="volver">Volver al lobby</button>`);
     }else{const vr=g.venceReeng?Math.max(0,Math.ceil((g.venceReeng-Date.now())/1000)):0;
       const ven=vr>0?`<p class="note">${fuera?'Tenés':'Esperando un posible reenganche:'} <b id="cdre" class="mono gold">${vr}s</b>${fuera?' para reengancharte.':''}</p>`:'';
       bt=`<h2>${nom(R.cerro)} cerró la mano</h2>`+ven+(fuera?`<button class="b2" data-a="reeng" ${busy||me.saldo<(m.reeng||m.entrada)?'disabled':''}>Reengancharse ${(m.reeng||m.entrada)?'por '+fmt(m.reeng||m.entrada):'gratis'}</button>`:'')+(fuera?'':`<p class="note">Tenés <b id="cdr" class="mono gold">${Math.max(0,Math.ceil((g.venceR-Date.now())/1000))}s</b> para tocar Listo, o perdés la partida.</p>`)+`<button class="b1" data-a="sig" ${busy||fuera||(g.listosR||{})[u]?'disabled':''}>${(g.listosR||{})[u]?'Esperando a los demás':'Listo para la siguiente mano'} (${Object.keys(g.listosR||{}).length}/${g.orden.filter(x=>!g.fuera[x]).length})</button>`;}
@@ -280,7 +284,7 @@ function juegoView(){
     <div class="note" style="text-align:center">Mazo ${g.mazo.length} · Se elimina a los ${g.limite} puntos</div></div>
   ${res}${hand}
   <div class="acts"><button class="b2" data-a="tirar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy?'':'disabled'}>Descartar</button><button class="b1" data-a="cerrar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy&&canClose(yo,sel)?'':'disabled'}>Cerrar mano</button></div>
-  ${g.ganador||fuera?'':'<button class="b3" data-a="aband">Abandonar partida</button>'}`;
+  ${g.ganador||fuera?'':'<button class="b3" data-a="aband">Abandonar partida</button>'}${fuera&&!g.ganador?'<button class="b1" data-a="volver">Volver al lobby</button>':''}`;
 }
 let sel=null;const pref={ent:'',max:'4',lim:'100',sit:'si'};let cfg={comision:10,entradas:[500,1000,2000],turno:20,espera:40,reenganche:0,segReeng:20,whatsapp:''};
 
@@ -294,7 +298,7 @@ onAuthStateChanged(auth,u=>{
     unsubs.push(onSnapshot(doc(db,'users',u.uid),s=>{me=s.exists()?s.data():null;view()}));
     unsubs.push(onSnapshot(query(collection(db,'mesas'),where('estado','in',['esperando','jugando'])),s=>{
       mesas=s.docs.map(d=>({id:d.id,...d.data({serverTimestamps:'estimate'})})).filter(m=>m.uids.length||(m.estado==='esperando'&&(m.fija||m.entrada===0)));
-      mia=mesas.find(m=>m.uids.includes(u.uid))||null;detectarSonidos();view();
+      mia=buscarMia();detectarSonidos();view();
     }));
   }
   view();
@@ -374,7 +378,7 @@ document.addEventListener('click',async e=>{
   if(a==='modo'){modo=b.dataset.v;err='';return view()}
   if(a==='salir')return signOut(auth);
   if(a==='snd'){sonido=!sonido;try{localStorage.setItem('snd',sonido?'1':'0')}catch(e){}if(sonido)sonar('inicio');return view()}
-  if(['robar','tirar','cerrar','sig','reeng','cobrar','ready','sel','fin','aband'].includes(a))return juego(a,b);
+  if(['robar','tirar','cerrar','sig','reeng','cobrar','ready','sel','fin','aband','volver'].includes(a))return juego(a,b);
   if(a==='borrar'&&!confirm('¿Eliminar esta mesa?'))return;
   err='';busy=true;view();
   try{
