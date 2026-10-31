@@ -43,10 +43,10 @@ a.b1{text-decoration:none;text-align:center;display:block;border-radius:14px;pad
 .gc.nw::before{content:'';position:absolute;top:3px;right:3px;width:7px;height:7px;border-radius:50%;background:var(--gold)}
 .gc i{position:absolute;left:3px;right:3px;bottom:3px;height:4px;border-radius:2px}
 .hand{display:flex;gap:4px;justify-content:center;padding-top:14px}
-.piles{display:flex;gap:22px;justify-content:center}.piles .gc{width:64px;flex:none}
+.piles{display:flex;gap:22px;justify-content:center}.piles .gc{width:92px;flex:none}
 .mcs{display:flex;flex-wrap:wrap;gap:3px}.mc{font-family:var(--mono);font-size:12px;background:#f4ecd8;color:#222;border-radius:4px;padding:2px 4px;font-weight:700}.mc.j{background:#3b2a5c;color:var(--gold)}
 .acts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.hand .gc{max-width:78px;font-size:clamp(17px,5.4vw,26px)}.gc.sel{transform:translateY(-6px)}
+.hand .gc{max-width:94px;font-size:clamp(17px,5.4vw,26px)}.gc.sel{transform:translateY(-6px)}
 .grp{display:flex;gap:3px;padding:3px;border:1px solid var(--ok);border-radius:7px}
 </style>
 </head>
@@ -112,7 +112,7 @@ function detectarSonidos(){
 }
 
 /* ---------- Motor del Chinchón (cartas 0-39 = palo*10+posición, 40-41 = comodines) ---------- */
-const RK=[1,2,3,4,5,6,7,8,9,10,11,12],SU=['🟡','🏆','⚔️','🪵​'],COL=['#f2c14e','#5fd08a','#6aa9ff','#e8665a'];
+const RK=[1,2,3,4,5,6,7,8,9,10,11,12],SU=['🟡','🏆','⚔️','🪾'],COL=['#f2c14e','#5fd08a','#6aa9ff','#e8665a'];
 const dc=n=>n>=48?{j:true,s:4,p:99,r:0}:{j:false,s:(n/12)|0,p:n%12,r:RK[n%12]};
 const pt=n=>{const c=dc(n);return c.j?25:c.r<=9?c.r:10};
 const ord=h=>h.slice().sort((a,b)=>a-b);
@@ -256,7 +256,7 @@ const mini=n=>{const c=dc(n);return `<span class="mc ${c.j?'j':''}">${c.j?'🃏'
 function juegoView(){
   const m=mia,g=m.g,u=U.uid,yo=g.manos[u]||[],mi=g.orden[g.turno]===u&&g.fase!=='resumen',fuera=!!g.fuera[u];
   const nom=x=>esc(g.nombres[x]);
-  const ops=g.orden.filter(x=>x!==u).map(x=>`<div class="seat ${g.orden[g.turno]===x&&g.fase!=='resumen'?'me':''}" style="min-height:0;padding:10px 4px;${g.fuera[x]?'opacity:.45':''}"><div class="av" style="width:40px;height:40px;font-size:16px">${esc(g.nombres[x][0].toUpperCase())}</div><b style="font-size:13px">${nom(x)}</b><span class="mono" style="font-size:13px">${g.puntos[x]} pts</span><span class="tag">${g.fuera[x]?'Eliminado':(g.manos[x]||[]).length+' cartas'}</span></div>`).join('');
+  const ops=[u,...g.orden.filter(x=>x!==u)].map(x=>`<div class="seat ${g.orden[g.turno]===x&&g.fase!=='resumen'?'me':''}" style="min-height:0;padding:10px 4px;${g.fuera[x]?'opacity:.45':''}"><div class="av" style="width:40px;height:40px;font-size:16px">${esc(g.nombres[x][0].toUpperCase())}</div><b style="font-size:13px">${x===u?'Vos':nom(x)}</b><span class="mono gold" style="font-size:22px;font-weight:800;line-height:1.1">${g.puntos[x]}<small style="font-size:11px;font-weight:600"> pts</small></span>${g.fuera[x]?'<span class="tag">Eliminado</span>':''}</div>`).join('');
   const msg=g.fase==='resumen'?'Fin de la mano':fuera?'Estás eliminado. Podés mirar la partida.':mi?(g.fase==='robar'?'Tu turno: sacá del mazo o del descarte':'Elegí una carta para descartar o cerrar'):'Juega '+nom(g.orden[g.turno])+'…';
   const top=g.desc[g.desc.length-1],OR=ordenar(yo),mk=OR.col;
   const hs=fuera?[]:OR.cartas.map(n=>gcard(n,(sel===n?'sel ':'')+(g.nuevo===n?'nw':''),`data-a="sel" data-c="${n}" role="button" tabindex="0"`).replace(/<\/div>$/,mk[n]?`<i style="background:${mk[n]}"></i></div>`:'</div>'));
@@ -274,10 +274,10 @@ function juegoView(){
     res=`<div class="card">${bt}${filas}</div>`;
   }
   return `${head()}<div class="pozo"><span class="note">${esc(m.nombre)} · Entrada ${fmt(m.entrada)}</span><div style="text-align:right"><span class="note">Pozo</span><br><b>${fmt(neto(m.pozo))}</b></div></div>
-  <div style="display:grid;grid-template-columns:repeat(${g.orden.length-1},1fr);gap:8px">${ops}</div>
+  <div style="display:grid;grid-template-columns:repeat(${g.orden.length<=4?g.orden.length:3},1fr);gap:8px">${ops}</div>
   <div class="card"><div class="row" style="justify-content:center"><b>${msg}</b>${g.fase==='resumen'?'':`<span id="cd" class="mono gold">${Math.max(0,Math.ceil((g.vence-Date.now())/1000))}s</span>`}</div>${err?`<div class="err">${err}</div>`:''}
     <div class="piles"><div class="gc back ${mi&&g.fase==='robar'?'go':''}" data-a="robar" data-f="mazo" role="button" tabindex="0" aria-label="Sacar del mazo"></div>${gcard(top,mi&&g.fase==='robar'?'go':'',`data-a="robar" data-f="desc" role="button" tabindex="0" aria-label="Levantar del descarte"`)}</div>
-    <div class="note" style="text-align:center">Mazo ${g.mazo.length} · Tus puntos ${g.puntos[u]}/${g.limite}</div></div>
+    <div class="note" style="text-align:center">Mazo ${g.mazo.length} · Se elimina a los ${g.limite} puntos</div></div>
   ${res}${hand}
   <div class="acts"><button class="b2" data-a="tirar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy?'':'disabled'}>Descartar</button><button class="b1" data-a="cerrar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy&&canClose(yo,sel)?'':'disabled'}>Cerrar mano</button></div>
   ${g.ganador||fuera?'':'<button class="b3" data-a="aband">Abandonar partida</button>'}`;
