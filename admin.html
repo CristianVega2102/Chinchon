@@ -30,7 +30,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:2
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {getFirestore,doc,onSnapshot,collection,query,orderBy,limit,setDoc,updateDoc,writeBatch,increment,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getFirestore,doc,onSnapshot,collection,query,orderBy,limit,where,setDoc,updateDoc,writeBatch,increment,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app=initializeApp({
   apiKey:"AIzaSyCkJfAUeCfppXpnB4K6I8z5u_OmsH5AcxY",
@@ -43,10 +43,10 @@ const app=initializeApp({
 const auth=getAuth(app),db=getFirestore(app),A=document.getElementById('app');
 const fmt=n=>'$'+Math.round(n).toLocaleString('es-AR');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let U=null,me=null,cfg={comision:10,entradas:[500,1000,2000],turno:20,espera:40,reenganche:0,segReeng:20,whatsapp:''},us=[],mv=[],q='',err='',ok='',unsubs=[];
+let U=null,me=null,cfg={comision:10,entradas:[500,1000,2000],turno:20,espera:40,reenganche:0,segReeng:20,whatsapp:''},us=[],mv=[],fx=[],fxOk=false,rk=[],q='',err='',ok='',unsubs=[];
 
 onAuthStateChanged(auth,u=>{
-  unsubs.forEach(f=>f());unsubs=[];U=u;me=null;us=[];mv=[];
+  unsubs.forEach(f=>f());unsubs=[];U=u;me=null;us=[];mv=[];fx=[];fxOk=false;rk=[];
   if(u){
     unsubs.push(onSnapshot(doc(db,'users',u.uid),s=>{
       const was=me&&me.admin;me=s.exists()?s.data():null;
@@ -54,6 +54,8 @@ onAuthStateChanged(auth,u=>{
         unsubs.push(onSnapshot(collection(db,'users'),s=>{us=s.docs.map(d=>({id:d.id,...d.data()}));lista()}));
         unsubs.push(onSnapshot(query(collection(db,'movimientos'),orderBy('creado','desc'),limit(15)),s=>{mv=s.docs.map(d=>d.data());hist()}));
         unsubs.push(onSnapshot(doc(db,'config','general'),s=>{if(s.exists())cfg={...cfg,...s.data()};view()}));
+        unsubs.push(onSnapshot(query(collection(db,'mesas'),where('estado','==','esperando')),s=>{fx=s.docs.map(d=>({id:d.id,...d.data()}));if(!fxOk){fxOk=true;view()}else estados()}));
+        unsubs.push(onSnapshot(collection(db,'ranking'),s=>{rk=s.docs.map(d=>({id:d.id,...d.data()}));rkv()}));
       }
       view();
     }));
@@ -76,9 +78,133 @@ function view(){
     <label>WhatsApp para cargas (solo números, con código de país. Ej: 5493815551234)<input name="wa" inputmode="numeric" value="${esc(cfg.whatsapp||'')}"></label>
     ${err?`<div class="err">${err}</div>`:''}${ok?`<div class="okm">${ok}</div>`:''}
     <button class="b1">Guardar configuración</button></form>
+  ${fijasHTML()}
+  ${rankCard()}
   <div class="card"><h2>Jugadores</h2><div class="note" id="cont"></div><input id="q" placeholder="Buscar por nombre o código" value="${esc(q)}" aria-label="Buscar jugador"><div id="lista"></div></div>
   <div class="card"><h2>Últimos movimientos</h2><div id="hist"></div></div>`;
-  lista();hist();
+  lista();hist();estados();rkv();
+}
+const FIJAS=[[2,'Mano a mano'],[3,'Mesa de 3 jugadores'],[4,'Mesa de 4 jugadores']];
+let fm={t:'',bad:false};
+function tabla(){
+  return rk.map(x=>({id:x.id,name:x.name||'?',j:x.jugadas||0,g:x.ganadas||0,p:x.perdidas||0})).filter(x=>x.j>0)
+    .sort((a,b)=>b.g-a.g||(b.g/b.j)-(a.g/a.j)||b.j-a.j||a.name.localeCompare(b.name));
+}
+const pc=x=>Math.round(x.g*100/x.j)+'%';
+function fijasHTML(){
+  return `<form class="card" id="mf"><h2>Mesas fijas</h2><p class="note">Hay 3 mesas siempre disponibles. Cuando una empieza a jugar, se vuelve a abrir vacía. Para cambiar la entrada o los puntos, la mesa tiene que estar sin jugadores.</p>`
+  +FIJAS.map(([n,nom])=>{const m=fx.find(x=>x.id==='mesa-'+n),en=m?m.entrada:(cfg.entradas[0]||0),li=m?m.limite:100;
+    return `<div class="u"><div class="row"><b>${nom}</b><span id="st-${n}" class="note"></span></div>
+    <div class="row"><label style="flex:1">Entrada (0 = gratis)<input name="e${n}" type="number" min="0" max="100000" step="1" value="${en}"></label>
+    <label style="flex:1">Puntos para eliminar<input name="l${n}" type="number" min="20" max="500" step="10" value="${li}"></label></div></div>`}).join('')
+  +(fm.t?`<div class="${fm.bad?'err':'okm'}">${esc(fm.t)}</div>`:'')
+  +`<div id="viejas"></div><button class="b1">Crear / guardar las 3 mesas</button></form>`;
+}
+function estados(){
+  FIJAS.forEach(([n])=>{const el=document.getElementById('st-'+n);if(!el)return;
+    const m=fx.find(x=>x.id==='mesa-'+n);
+    el.innerHTML=m?`${m.uids.length}/${m.max} sentados${m.uids.length?` <button type="button" class="b3" style="padding:4px 8px;color:var(--bad)" data-a="vaciar" data-id="${m.id}">Vaciar</button>`:''}`:'Sin crear';
+  });
+  const v=document.getElementById('viejas');
+  if(v){const o=fx.filter(m=>!/^mesa-[234]$/.test(m.id));
+    v.innerHTML=o.length?`<p class="note">Hay ${o.length} mesa(s) vieja(s) abierta(s).</p><button type="button" class="b2" data-a="viejas">Borrar mesas viejas</button>`:''}
+}
+async function guardarFijas(f){
+  const w=writeBatch(db),bloq=[];let hubo=0;
+  for(const [n,nom] of FIJAS){
+    const entrada=Math.floor(+f.get('e'+n)),limite=Math.floor(+f.get('l'+n));
+    if(!(entrada>=0&&entrada<=100000)||!(limite>=20&&limite<=500)){fm={t:'Revisá la entrada (0 a 100000) y los puntos para eliminar (20 a 500).',bad:true};return view()}
+    const ex=fx.find(x=>x.id==='mesa-'+n);
+    if(ex&&ex.uids.length){bloq.push(nom);continue}
+    w.set(doc(db,'mesas','mesa-'+n),{nombre:nom,entrada,max:n,limite,listos:[],reeng:entrada===0?0:(cfg.reenganche>0?cfg.reenganche:entrada),pozo:0,fija:true,anfitrion:'',cuentaIni:serverTimestamp(),estado:'esperando',uids:[],jugadores:[],creada:serverTimestamp()});
+    hubo++;
+  }
+  try{if(hubo)await w.commit();fm={t:'Mesas guardadas.'+(bloq.length?' No se cambió: '+bloq.join(', ')+' (tiene jugadores sentados).':''),bad:false}}
+  catch(x){fm={t:'No se pudo guardar. Revisá las reglas de Firestore.',bad:true}}
+  view();
+}
+function rankCard(){
+  return `<div class="card"><h2>Ranking</h2><div class="note" id="rkn"></div><div id="rkl"></div>
+  <button class="b1" data-a="png">Descargar ranking (PNG)</button>${navigator.canShare?'<button class="b2" data-a="share">Compartir por WhatsApp</button>':''}</div>`;
+}
+function rkv(){
+  const el=document.getElementById('rkl');if(!el)return;const t=tabla();
+  document.getElementById('rkn').textContent=t.length+' jugadores con partidas · el PNG incluye el top 20 (J · G · P · %)';
+  el.innerHTML=t.slice(0,10).map((x,i)=>`<div class="mv"><span>${i+1}. ${esc(x.name)}</span><span class="mono">${x.j} · ${x.g} · ${x.p} · ${pc(x)}</span></div>`).join('')||'<p class="note">Todavía no hay partidas registradas.</p>';
+}
+function rr(x,a,b,w,h,r){x.beginPath();x.moveTo(a+r,b);x.arcTo(a+w,b,a+w,b+h,r);x.arcTo(a+w,b+h,a,b+h,r);x.arcTo(a,b+h,a,b,r);x.arcTo(a,b,a+w,b,r);x.closePath()}
+async function dibujar(){
+  const t=tabla().slice(0,20);
+  try{await Promise.all([document.fonts.load('800 40px "Plus Jakarta Sans"'),document.fonts.load('700 30px "JetBrains Mono"')])}catch(e){}
+  const SANS='"Plus Jakarta Sans",system-ui,sans-serif',MONO='"JetBrains Mono",ui-monospace,monospace';
+  const W=1080,RH=86,TOP=330,n=Math.max(t.length,1),H=TOP+n*RH+130;
+  const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+  x.fillStyle='#0e1b15';x.fillRect(0,0,W,H);
+  x.fillStyle='#15271e';rr(x,30,30,W-60,H-60,36);x.fill();x.strokeStyle='#22392d';x.lineWidth=3;x.stroke();
+  x.textBaseline='middle';x.textAlign='center';
+  x.fillStyle='#f2c14e';x.font='800 66px '+SANS;x.fillText('🏆 RANKING CHINCHÓN',W/2,125);
+  x.fillStyle='#8fa597';x.font='600 30px '+SANS;x.fillText('Actualizado el '+new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric'}),W/2,200);
+  const CX={j:650,g:750,p:850,pc:970};
+  x.fillStyle='#8fa597';x.font='700 26px '+SANS;
+  x.textAlign='left';x.fillText('JUGADOR',170,TOP-40);
+  x.textAlign='center';x.fillText('JUG',CX.j,TOP-40);x.fillText('GAN',CX.g,TOP-40);x.fillText('PER',CX.p,TOP-40);x.fillText('VIC %',CX.pc,TOP-40);
+  const cut=(s,w)=>{if(x.measureText(s).width<=w)return s;while(s.length>1&&x.measureText(s+'…').width>w)s=s.slice(0,-1);return s+'…'};
+  if(!t.length){x.textAlign='center';x.fillStyle='#8fa597';x.font='600 34px '+SANS;x.fillText('Todavía no hay partidas registradas',W/2,TOP+RH/2)}
+  t.forEach((p,i)=>{
+    const y=TOP+i*RH,cy=y+RH/2-4;
+    if(i%2===0){x.fillStyle='#1a3025';rr(x,60,y,W-120,RH-8,18);x.fill()}
+    x.textAlign='center';x.fillStyle=i===0?'#f2c14e':'#e8f0ea';x.font='700 36px '+MONO;
+    x.fillText(i<3?['🥇','🥈','🥉'][i]:String(i+1),115,cy);
+    x.textAlign='left';x.font='800 36px '+SANS;x.fillStyle=i===0?'#f2c14e':'#e8f0ea';x.fillText(cut(p.name,430),170,cy);
+    x.textAlign='center';x.font='700 34px '+MONO;
+    x.fillStyle='#e8f0ea';x.fillText(String(p.j),CX.j,cy);
+    x.fillStyle='#5fd08a';x.fillText(String(p.g),CX.g,cy);
+    x.fillStyle='#e8665a';x.fillText(String(p.p),CX.p,cy);
+    x.fillStyle='#f2c14e';x.fillText(pc(p),CX.pc,cy);
+  });
+  x.textAlign='center';x.fillStyle='#8fa597';x.font='600 26px '+SANS;
+  x.fillText('JUG = jugadas · GAN = ganadas · PER = perdidas',W/2,H-80);
+  return new Promise(r=>c.toBlob(r,'image/png'));
+}
+async function accion(a,b){
+  if(a==='png'||a==='share'){
+    b.disabled=true;
+    try{
+      const blob=await dibujar(),nom='ranking-chinchon-'+new Date().toISOString().slice(0,10)+'.png';
+      if(a==='share'){
+        const f=new File([blob],nom,{type:'image/png'});
+        if(navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],title:'Ranking Chinchón'});
+        else alert('Este navegador no puede compartir imágenes. Usá el botón Descargar.');
+      }else{
+        const url=URL.createObjectURL(blob),l=document.createElement('a');
+        l.href=url;l.download=nom;document.body.appendChild(l);l.click();l.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),5000);
+      }
+    }catch(x){if(!x||x.name!=='AbortError')alert('No se pudo generar la imagen.')}
+    b.disabled=false;return;
+  }
+  if(a==='vaciar'){
+    const m=fx.find(x=>x.id===b.dataset.id);if(!m||!m.uids.length)return;
+    if(!confirm('¿Vaciar '+m.nombre+'?'+(m.entrada>0?' Se devuelve la entrada ('+fmt(m.entrada)+') a cada jugador.':'')))return;
+    b.disabled=true;
+    try{
+      const w=writeBatch(db);
+      w.update(doc(db,'mesas',m.id),{uids:[],jugadores:[],pozo:0,listos:[],cuentaIni:serverTimestamp()});
+      if(m.entrada>0)m.uids.forEach(u=>w.update(doc(db,'users',u),{saldo:increment(m.entrada)}));
+      await w.commit();
+    }catch(x){alert('No se pudo vaciar la mesa.');b.disabled=false}
+    return;
+  }
+  if(a==='viejas'){
+    const l=fx.filter(m=>!/^mesa-[234]$/.test(m.id));if(!l.length)return;
+    if(!confirm('¿Borrar '+l.length+' mesa(s) vieja(s)? Se devuelven las entradas a quienes estén sentados.'))return;
+    b.disabled=true;
+    try{
+      const w=writeBatch(db);
+      l.forEach(m=>{w.delete(doc(db,'mesas',m.id));if(m.entrada>0)(m.uids||[]).forEach(u=>w.update(doc(db,'users',u),{saldo:increment(m.entrada)}))});
+      await w.commit();
+    }catch(x){alert('No se pudo borrar.');b.disabled=false}
+  }
 }
 function lista(){
   const el=document.getElementById('lista');if(!el)return;
@@ -95,6 +221,7 @@ function hist(){
 document.addEventListener('input',e=>{if(e.target.id==='q'){q=e.target.value;lista()}});
 document.addEventListener('submit',async e=>{
   e.preventDefault();const f=new FormData(e.target);err='';ok='';
+  if(e.target.id==='mf')return guardarFijas(f);
   try{
     if(e.target.id==='f')await signInWithEmailAndPassword(auth,f.get('email'),f.get('pass'));
     if(e.target.id==='cf'){
@@ -109,6 +236,7 @@ document.addEventListener('submit',async e=>{
 document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a;
   if(a==='salir')return signOut(auth);
+  if(['png','share','vaciar','viejas'].includes(a))return accion(a,b);
   if(a==='blq'||a==='del'){
     const u=us.find(x=>x.id===b.dataset.u);if(!u||u.admin)return;
     if(a==='blq'){
