@@ -46,7 +46,7 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 let U=null,me=null,cfg={comision:10,entradas:[500,1000,2000],turno:20,espera:40,reenganche:0,segReeng:20,whatsapp:''},us=[],mv=[],fx=[],fxOk=false,rk=[],q='',err='',ok='',unsubs=[];
 
 onAuthStateChanged(auth,u=>{
-  unsubs.forEach(f=>f());unsubs=[];U=u;me=null;us=[];mv=[];fx=[];fxOk=false;rk=[];
+  unsubs.forEach(f=>f());unsubs=[];U=u;me=null;us=[];mv=[];fx=[];fxOk=false;rk=[];pd=[];
   if(u){
     unsubs.push(onSnapshot(doc(db,'users',u.uid),s=>{
       const was=me&&me.admin;me=s.exists()?s.data():null;
@@ -56,6 +56,7 @@ onAuthStateChanged(auth,u=>{
         unsubs.push(onSnapshot(doc(db,'config','general'),s=>{if(s.exists())cfg={...cfg,...s.data()};view()}));
         unsubs.push(onSnapshot(query(collection(db,'mesas'),where('estado','==','esperando')),s=>{fx=s.docs.map(d=>({id:d.id,...d.data()}));if(!fxOk){fxOk=true;view()}else estados()}));
         unsubs.push(onSnapshot(collection(db,'ranking'),s=>{rk=s.docs.map(d=>({id:d.id,...d.data()}));rkv()}));
+        unsubs.push(()=>{if(unPart)unPart();unPart=null});subPartidas();
       }
       view();
     }));
@@ -80,10 +81,11 @@ function view(){
     <button class="b1">Guardar configuración</button></form>
   ${fijasHTML()}
   ${pruebaCard()}
+  ${partidasCard()}
   ${rankCard()}
   <div class="card"><h2>Jugadores</h2><div class="note" id="cont"></div><input id="q" placeholder="Buscar por nombre o código" value="${esc(q)}" aria-label="Buscar jugador"><div id="lista"></div></div>
   <div class="card"><h2>Últimos movimientos</h2><div id="hist"></div></div>`;
-  lista();hist();estados();rkv();
+  lista();hist();estados();rkv();ptv();
 }
 const FIJAS=[[2,'Mano a mano'],[3,'Mesa de 3 jugadores'],[4,'Mesa de 4 jugadores']];
 let fm={t:'',bad:false};
@@ -211,6 +213,33 @@ async function accion(a,b){
     }catch(x){alert('No se pudo borrar.');b.disabled=false}
   }
 }
+/* ---------- Registro de partidas del día ---------- */
+let pd=[],unPart=null;
+const hoyStr=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+let diaSel=hoyStr();
+function subPartidas(){
+  if(unPart)unPart();
+  const [y,m,d]=diaSel.split('-').map(Number),a=new Date(y,m-1,d),b=new Date(y,m-1,d+1);
+  unPart=onSnapshot(query(collection(db,'partidas'),where('fecha','>=',a),where('fecha','<',b),orderBy('fecha','desc'),limit(300)),
+    s=>{pd=s.docs.map(x=>({id:x.id,...x.data({serverTimestamps:'estimate'})}));ptv()},
+    ()=>{pd=[];ptv()});
+}
+function partidasCard(){
+  return `<div class="card"><h2>Partidas del día</h2>
+  <label>Día<input id="dia" type="date" value="${diaSel}" max="${hoyStr()}"></label>
+  <div class="note" id="ptn"></div><div id="ptl"></div></div>`;
+}
+function ptv(){
+  const el=document.getElementById('ptl'),nt=document.getElementById('ptn');if(!el)return;
+  const pozo=pd.reduce((s,x)=>s+(x.pozo||0),0),prem=pd.reduce((s,x)=>s+(x.premio||0),0);
+  nt.innerHTML=pd.length?`<b class="mono gold">${pd.length}</b> partida${pd.length===1?'':'s'} · pozo total <b class="mono">${fmt(pozo)}</b> · premios <b class="mono">${fmt(prem)}</b> · comisión de la casa <b class="mono gold">${fmt(pozo-prem)}</b>`:'';
+  el.innerHTML=pd.length?pd.map(x=>{
+    const h=x.fecha&&x.fecha.toDate?x.fecha.toDate().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):'';
+    return `<div class="u"><div class="row"><b>${h} · ${esc(x.mesa||'Mesa')}</b><span class="mono gold">${fmt(x.pozo||0)}</span></div>
+    <span class="note">Jugaron: ${(x.jugadores||[]).map(esc).join(', ')}</span>
+    <span class="note">🏆 Ganó ${esc(x.ganador||'?')} · premio ${fmt(x.premio||0)}</span></div>`}).join(''):'<p class="note">No hay partidas registradas ese día.</p>';
+}
+document.addEventListener('change',e=>{if(e.target.id==='dia'&&e.target.value){diaSel=e.target.value;subPartidas()}});
 function lista(){
   const el=document.getElementById('lista');if(!el)return;
   const t=q.trim().toLowerCase();
