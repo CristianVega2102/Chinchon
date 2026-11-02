@@ -211,9 +211,9 @@ async function autoIniciar(){
       if(d.fija){
         /* mesa fija: la partida se juega en una mesa nueva y la fija queda vacía y disponible */
         const nref=doc(collection(db,'mesas'));
-        const {cuentaIni,...resto}=d;
+        const {cuentaIni,ultima,...resto}=d;
         t.set(nref,{...resto,fija:false,origen:m.id,estado:'jugando',g:armarG(d),iniciada:serverTimestamp()});
-        t.update(ref,{uids:[],jugadores:[],pozo:0,listos:[],cuentaIni:serverTimestamp()});
+        t.update(ref,{uids:[],jugadores:[],pozo:0,listos:[],cuentaIni:serverTimestamp(),ultima:nref.id});
       }else t.update(ref,{estado:'jugando',g:armarG(d)});
     });
   }catch(e){}
