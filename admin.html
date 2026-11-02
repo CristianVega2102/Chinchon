@@ -79,6 +79,7 @@ function view(){
     ${err?`<div class="err">${err}</div>`:''}${ok?`<div class="okm">${ok}</div>`:''}
     <button class="b1">Guardar configuración</button></form>
   ${fijasHTML()}
+  ${pruebaCard()}
   ${rankCard()}
   <div class="card"><h2>Jugadores</h2><div class="note" id="cont"></div><input id="q" placeholder="Buscar por nombre o código" value="${esc(q)}" aria-label="Buscar jugador"><div id="lista"></div></div>
   <div class="card"><h2>Últimos movimientos</h2><div id="hist"></div></div>`;
@@ -166,7 +167,11 @@ async function dibujar(){
   x.fillText('JUG = jugadas · GAN = ganadas · PER = perdidas',W/2,H-80);
   return new Promise(r=>c.toBlob(r,'image/png'));
 }
+function pruebaCard(){
+  return `<div class="card"><h2>Mesa de prueba (bot)</h2><p class="note">Una mesa aparte, gratis, donde el usuario juega contra un bot. No usa saldo ni cuenta para el ranking.</p><div class="row"><b>${cfg.prueba?'ACTIVADA':'DESACTIVADA'}</b><button type="button" class="${cfg.prueba?'b2':'b1'}" data-a="prueba">${cfg.prueba?'Desactivar':'Activar'}</button></div></div>`;
+}
 async function accion(a,b){
+  if(a==='prueba'){b.disabled=true;try{await setDoc(doc(db,'config','general'),{prueba:!cfg.prueba},{merge:true})}catch(x){alert('No se pudo cambiar.')}b.disabled=false;return}
   if(a==='png'||a==='share'){
     b.disabled=true;
     try{
@@ -228,7 +233,7 @@ document.addEventListener('submit',async e=>{
       const comision=Math.floor(+f.get('com')),entradas=[...new Set(String(f.get('ent')).split(',').map(x=>Math.floor(+x.trim())).filter(n=>n>0))].slice(0,6);
       const turno=Math.floor(+f.get('tur')),espera=Math.floor(+f.get('esp')),reenganche=Math.floor(+f.get('ree')),segReeng=Math.floor(+f.get('sre'));
       if(!(comision>=0&&comision<=50)||!entradas.length||!(turno>=10&&turno<=120)||!(espera>=10&&espera<=120)||!(reenganche>=0&&reenganche<=100000)||!(segReeng>=5&&segReeng<=120)){err='Revisá la comisión (0 a 50), los segundos de turno y de espera (10 a 120), el reenganche (costo y segundos) y las entradas.';return view()}
-      await setDoc(doc(db,'config','general'),{comision,entradas,turno,espera,reenganche,segReeng,whatsapp:String(f.get('wa')).replace(/\D/g,'')});
+      await setDoc(doc(db,'config','general'),{prueba:!!cfg.prueba,comision,entradas,turno,espera,reenganche,segReeng,whatsapp:String(f.get('wa')).replace(/\D/g,'')});
       ok='Configuración guardada.';view();
     }
   }catch(x){err=x.code==='auth/invalid-credential'?'Correo o contraseña incorrectos.':'No se pudo completar. Probá de nuevo.';view()}
@@ -236,7 +241,7 @@ document.addEventListener('submit',async e=>{
 document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a;
   if(a==='salir')return signOut(auth);
-  if(['png','share','vaciar','viejas'].includes(a))return accion(a,b);
+  if(['png','share','vaciar','viejas','prueba'].includes(a))return accion(a,b);
   if(a==='blq'||a==='del'){
     const u=us.find(x=>x.id===b.dataset.u);if(!u||u.admin)return;
     if(a==='blq'){

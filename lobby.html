@@ -140,7 +140,7 @@ function cerrarMano(g,uid,chin){
   const nuevos=g.orden.filter(u=>g.manos[u].length&&g.puntos[u]>g.limite);
   nuevos.forEach(u=>{g.fuera[u]=true});
   const act=g.orden.filter(u=>!g.fuera[u]);
-  if(chin||act.length<=1){g.ganador=chin?uid:act[0];g.pagado=false}
+  if(chin||act.length<=1){g.ganador=chin?uid:(act[0]||nuevos.slice().sort((a,b)=>g.puntos[a]-g.puntos[b])[0]);delete g.fuera[g.ganador];g.pagado=false}
   g.venceReeng=(!g.ganador&&nuevos.length)?Date.now()+(g.segReeng||20)*1000:0;
   g.res={cerro:uid,chin,filas};g.fase='resumen';
   g.venceR=g.ganador?0:(g.venceReeng||Date.now())+(g.esp||ESPERA)*1000}
@@ -182,7 +182,7 @@ function autoJugar(g){
 /* ---------- Jugadas en línea ---------- */
 async function mover(fn){
   const ref=doc(db,'mesas',mia.id);
-  await runTransaction(db,async t=>{const s=await t.get(ref);const d=s.data(),g=d.g;const x=fn(g,d,t);t.update(ref,{g,...(x||{})})});
+  await runTransaction(db,async t=>{const s=await t.get(ref);const d=s.data(),g=d.g;const x=fn(g,d,t);if(d.prueba&&g.ganador&&!g.pagado)g.pagado=true;t.update(ref,{g,...(x||{})})});
 }
 /* Estadísticas del ranking: se anotan una sola vez por partida, aparte de la jugada (si falla, la partida sigue igual) */
 const regT={};
@@ -192,7 +192,7 @@ async function registrarStats(id){
     const ref=doc(db,'mesas',id);
     await runTransaction(db,async t=>{
       const d=(await t.get(ref)).data(),g=d&&d.g;
-      if(!g||!g.ganador||g.reg)return;
+      if(!g||d.prueba||!g.ganador||g.reg)return;
       g.reg=true;
       g.orden.forEach(u=>t.set(doc(db,'ranking',u),{name:g.nombres[u],jugadas:increment(1),ganadas:increment(u===g.ganador?1:0),perdidas:increment(u===g.ganador?0:1)},{merge:true}));
       t.update(ref,{g});
@@ -227,6 +227,35 @@ async function autoIniciar(){
   }catch(e){}
   iniciando=null;
 }
+/* ---------- Bot de la mesa de prueba (lo mueve el celular del jugador) ---------- */
+function botJuega(g,u='bot'){
+  let h=g.manos[u];
+  const mejorDesc=m=>{let bi=0,bp=1e9,bc=-1;m.forEach((c,i)=>{const p=best(m.filter((_,k)=>k!==i)).pts;if(p<bp||(p===bp&&pt(c)>bc)){bp=p;bi=i;bc=pt(c)}});return{i:bi,p:bp}};
+  const conTop=mejorDesc(ord([...h,g.desc[g.desc.length-1]])).p;
+  let c;
+  if(conTop<best(h).pts)c=g.desc.pop();
+  else{if(!g.mazo.length){const t=g.desc.pop();g.mazo=shuf(g.desc);g.desc=[t]}c=g.mazo.pop()}
+  h=ord([...h,c]);
+  const r=mejorDesc(h),carta=h[r.i],resto=h.filter((_,k)=>k!==r.i);
+  g.desc.push(carta);g.manos[u]=resto;
+  if(isChin(resto)||r.p<=CORTE){cerrarMano(g,u,isChin(resto));return}
+  g.turno=sig(g,g.turno);g.fase='robar';g.nuevo=-1;g.vence=Date.now()+(g.seg||20)*1000;
+}
+let botBusy=false;
+setInterval(()=>{
+  if(!U||!mia||!mia.prueba||mia.estado!=='jugando'||botBusy)return;
+  const g=mia.g;
+  if(g.fase==='resumen'){
+    if(g.ganador||g.fuera.bot||(g.listosR||{}).bot)return;
+    botBusy=true;
+    mover(g2=>{if(g2.fase!=='resumen'||g2.ganador||g2.fuera.bot)return;g2.listosR=g2.listosR||{};g2.listosR.bot=true;if(todosListos(g2))repartir(g2)}).catch(()=>{}).finally(()=>{botBusy=false});
+    return;
+  }
+  if(g.ganador||g.orden[g.turno]!=='bot')return;
+  if(Date.now()-(g.vence-(g.seg||20)*1000)<1800)return;
+  const ve=g.vence;botBusy=true;
+  mover(g2=>{if(g2.vence!==ve||g2.fase==='resumen'||g2.orden[g2.turno]!=='bot')return;botJuega(g2)}).catch(()=>{}).finally(()=>{botBusy=false});
+},700);
 const tmo={};
 setInterval(()=>{
   if(!U||!mia||mia.estado!=='jugando')return;const g=mia.g;
@@ -329,7 +358,7 @@ onAuthStateChanged(auth,u=>{
     unsubs.push(onSnapshot(query(collection(db,'ranking'),orderBy('ganadas','desc'),limit(100)),s=>{rk=s.docs.map(d=>({id:d.id,...d.data()}));if(!mia)view()},()=>{}));
     unsubs.push(onSnapshot(query(collection(db,'mesas'),where('estado','in',['esperando','jugando'])),s=>{
       mesas=s.docs.map(d=>({id:d.id,...d.data({serverTimestamps:'estimate'})})).filter(m=>m.uids.length||(m.estado==='esperando'&&(m.fija||m.entrada===0)));
-      mia=buscarMia();detectarSonidos();if(mia&&mia.estado==='jugando'&&mia.g&&mia.g.ganador&&!mia.g.reg)registrarStats(mia.id);view();
+      mia=buscarMia();detectarSonidos();if(mia&&mia.estado==='jugando'&&mia.g&&mia.g.ganador&&!mia.g.reg&&!mia.prueba)registrarStats(mia.id);view();
     }));
   }
   view();
@@ -376,7 +405,11 @@ function rankHTML(){
   const fila=(x,i)=>`<div class="row" style="padding:9px 0;border-top:1px solid var(--line);${x.id===U.uid?'color:var(--gold)':''}"><span class="mono" style="width:30px">${i<3?['🥇','🥈','🥉'][i]:i+1}</span><b style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.name)}</b><span class="mono" style="font-size:12px">${x.j} · ${x.g} · ${x.p} · ${pc(x)}</span></div>`;
   return mio+`<div class="card"><h2>Mejores jugadores</h2><div class="note">Columnas: Jugadas · Ganadas · Perdidas · % de victorias</div>${t.length?t.slice(0,30).map(fila).join(''):'<p class="note">Todavía no hay partidas registradas.</p>'}</div>`;
 }
-function mesasHTML(){
+function pruebaHTML(){
+  return cfg.prueba?`<div class="card"><h2>🤖 Mesa de prueba</h2><p class="note">Jugá una partida de práctica contra un bot. Es gratis y no cuenta para el ranking.</p><button class="b2" data-a="bot" ${busy?'disabled':''}>Jugar contra el bot</button></div>`:'';
+}
+function mesasHTML(){return mesasFijasHTML()+pruebaHTML()}
+function mesasFijasHTML(){
   const ab=mesas.filter(m=>m.estado==='esperando'&&m.fija&&/^mesa-\d$/.test(m.id)).sort((a,b)=>a.max-b.max);
   const jug=mesas.filter(m=>m.estado==='jugando').length;
   if(!ab.length)return `<p class="note">${me.admin?'Todavía no están creadas las 3 mesas. Creálas desde el Panel de administrador.':'Las mesas todavía no están disponibles. Probá en unos minutos.'}</p>`;
@@ -434,6 +467,10 @@ document.addEventListener('click',async e=>{
   err='';busy=true;view();
   try{
     const uref=doc(db,'users',U.uid),batch=writeBatch(db);
+    if(a==='bot'){
+      const d0={uids:[U.uid,'bot'],jugadores:[{uid:U.uid,name:me.name},{uid:'bot',name:'Bot'}],max:2,limite:100};
+      batch.set(doc(collection(db,'mesas')),{nombre:'Mesa de prueba',entrada:0,max:2,limite:100,listos:[],reeng:0,pozo:0,fija:false,prueba:true,anfitrion:U.uid,estado:'jugando',uids:[U.uid],jugadores:[{uid:U.uid,name:me.name}],g:armarG(d0),creada:serverTimestamp()});
+    }
     if(a==='unirse'){
       const m=mesas.find(x=>x.id===b.dataset.id);
       batch.update(doc(db,'mesas',m.id),{uids:arrayUnion(U.uid),jugadores:arrayUnion({uid:U.uid,name:me.name}),pozo:increment(m.entrada),listos:[],cuentaIni:serverTimestamp()});
