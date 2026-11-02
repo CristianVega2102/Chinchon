@@ -147,12 +147,20 @@ function cerrarMano(g,uid,chin){
 const todosListos=g=>g.orden.filter(x=>!g.fuera[x]).every(x=>g.listosR[x])&&Date.now()>=(g.venceReeng||0);
 
 const ESPERA=40;
+/* Ubica cada comodín en el lugar de la carta que representa dentro de la escalera */
+function colocar(gr){
+  const nj=gr.filter(c=>c<48).sort((a,b)=>a-b),js=gr.filter(c=>c>=48),n=gr.length;
+  if(!js.length||nj.length<2||((nj[0]/12)|0)!==((nj[nj.length-1]/12)|0))return nj.concat(js);
+  const suit=(nj[0]/12)|0,s0=Math.min(nj[0]%12,12-n),out=[];
+  for(let i=0;i<n;i++){const c=suit*12+s0+i;out.push(nj.includes(c)?c:js.pop())}
+  return out.includes(undefined)?nj.concat(js):out;
+}
 function ordenar(h){const s=ord(h),b=best(s),usado=new Set(),out=[],col={};
   b.melds.forEach((m,k)=>{const gr=[];for(let i=0;i<s.length;i++)if(m>>i&1){gr.push(s[i]);usado.add(i)}
-    gr.sort((x,y)=>(x>=48)-(y>=48)||x-y).forEach(c=>{col[c]=COL[k%4];out.push(c)})});
+    colocar(gr).forEach(c=>{col[c]=COL[k%4];out.push(c)})});
   s.forEach((c,i)=>{if(!usado.has(i))out.push(c)});return{cartas:out,col}}
 function desglose(mano){const s=ord(mano),b=best(s),usado=new Set();
-  const grupos=b.melds.map(m=>{const gr=[];for(let i=0;i<s.length;i++)if(m>>i&1){gr.push(s[i]);usado.add(i)}return gr.sort((x,y)=>(x>=48)-(y>=48)||x-y)});
+  const grupos=b.melds.map(m=>{const gr=[];for(let i=0;i<s.length;i++)if(m>>i&1){gr.push(s[i]);usado.add(i)}return colocar(gr)});
   return{grupos,sueltas:s.filter((_,i)=>!usado.has(i)),pts:b.pts}}
 function vencioListo(g){
   const act=g.orden.filter(x=>!g.fuera[x]),lis=act.filter(x=>g.listosR[x]);
