@@ -393,7 +393,7 @@ function view(){
 }
 function authView(){
   const reg=modo==='up';
-  return `<h1 style="margin:0"><img class="logo g" src="logo.png" alt="Chinchón Online"></h1><p class="note" style="text-align:center">Mano a mano, 3 y 4 jugadores. Para jugar tenés que cargar saldo por WhatsApp.</p>
+  return `<h1 style="margin:0"><img class="logo g" src="logo.png" alt="Chinchón Online"></h1><p class="note" style="text-align:center">Mesas las 24 2, 3 y 4 jugadores. Mesa de prueba gratis.</p>
   <div class="tabs"><button class="${reg?'':'on'}" data-a="modo" data-v="in">Entrar</button><button class="${reg?'on':''}" data-a="modo" data-v="up">Crear cuenta</button></div>
   <form class="card" id="f">
     ${reg?'<input name="nombre" placeholder="Tu nombre en la mesa" maxlength="16" required autocomplete="nickname">':''}
