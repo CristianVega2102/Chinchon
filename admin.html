@@ -81,13 +81,14 @@ function view(){
     <button class="b1">Guardar configuración</button></form>
   ${fijasHTML()}
   ${pruebaCard()}
+  ${progCard()}
   ${partidasCard()}
   ${rankCard()}
   <div class="card"><h2>Jugadores</h2><div class="note" id="cont"></div><input id="q" placeholder="Buscar por nombre o código" value="${esc(q)}" aria-label="Buscar jugador"><div id="lista"></div></div>
   <div class="card"><h2>Últimos movimientos</h2><div id="hist"></div></div>`;
   lista();hist();estados();rkv();ptv();
 }
-const FIJAS=[[2,'Mano a mano'],[3,'Mesa de 3 jugadores'],[4,'Mesa de 4 jugadores']];
+const FIJAS=[[4,'Mesa principal']];
 let fm={t:'',bad:false};
 function tabla(){
   return rk.map(x=>({id:x.id,name:x.name||'?',j:x.jugadas||0,g:x.ganadas||0,p:x.perdidas||0})).filter(x=>x.j>0)
@@ -95,21 +96,44 @@ function tabla(){
 }
 const pc=x=>Math.round(x.g*100/x.j)+'%';
 function fijasHTML(){
-  return `<form class="card" id="mf"><h2>Mesas fijas</h2><p class="note">Hay 3 mesas siempre disponibles. Cuando una empieza a jugar, se vuelve a abrir vacía. Para cambiar la entrada o los puntos, la mesa tiene que estar sin jugadores.</p>`
+  return `<form class="card" id="mf"><h2>Mesa principal</h2><p class="note">Mesa de hasta 4 jugadores, siempre disponible. Empieza sola con una cuenta de 20 segundos (si se suma alguien, la cuenta vuelve a empezar) y se vuelve a abrir vacía. Para cambiar la entrada o los puntos, tiene que estar sin jugadores.</p>`
   +FIJAS.map(([n,nom])=>{const m=fx.find(x=>x.id==='mesa-'+n),en=m?m.entrada:(cfg.entradas[0]||0),li=m?m.limite:100;
     return `<div class="u"><div class="row"><b>${nom}</b><span id="st-${n}" class="note"></span></div>
     <div class="row"><label style="flex:1">Entrada (0 = gratis)<input name="e${n}" type="number" min="0" max="100000" step="1" value="${en}"></label>
     <label style="flex:1">Puntos para eliminar<input name="l${n}" type="number" min="20" max="500" step="10" value="${li}"></label></div></div>`}).join('')
   +(fm.t?`<div class="${fm.bad?'err':'okm'}">${esc(fm.t)}</div>`:'')
-  +`<div id="viejas"></div><button class="b1">Crear / guardar las 3 mesas</button></form>`;
+  +`<div id="viejas"></div><button class="b1">Crear / guardar la mesa principal</button></form>`;
+}
+let pm={t:'',bad:false};
+function progCard(){
+  const m=fx.find(x=>x.id==='mesa-prog'),en=m?m.entrada:(cfg.entradas[0]||0),li=m?m.limite:100,mx=m?m.max:4;
+  return `<form class="card" id="pf"><h2>Partida programada</h2><p class="note">Los jugadores se suscriben pagando la entrada y no pueden cancelar: solo vos podés cancelar la partida (se devuelven las entradas). Arranca a la hora indicada si hay 2 o más suscriptos; si hay menos, arranca apenas se suscriba el segundo.</p>
+  <div id="pgs"></div>
+  <label>Fecha y hora de inicio<input name="ini" type="datetime-local" required></label>
+  <div class="row"><label style="flex:1">Entrada (0 = gratis)<input name="ep" type="number" min="0" max="100000" step="1" value="${en}"></label>
+  <label style="flex:1">Puntos para eliminar<input name="lp" type="number" min="20" max="500" step="10" value="${li}"></label></div>
+  <label>Máximo de jugadores (2 a 6)<input name="mp" type="number" min="2" max="6" step="1" value="${mx}"></label>
+  ${pm.t?`<div class="${pm.bad?'err':'okm'}">${esc(pm.t)}</div>`:''}
+  <button class="b1">Programar partida</button></form>`;
+}
+function progv(){
+  const el=document.getElementById('pgs');if(!el)return;
+  const m=fx.find(x=>x.id==='mesa-prog');
+  if(!m||!m.inicio||!m.inicio.toDate){el.innerHTML='<p class="note">No hay ninguna partida programada.</p>';return}
+  const cuando=m.inicio.toDate().toLocaleString('es-AR',{weekday:'long',day:'2-digit',month:'long',hour:'2-digit',minute:'2-digit'});
+  el.innerHTML=`<div class="u"><div class="row"><b>Programada: ${esc(cuando)}</b><span class="mono gold">${m.uids.length}/${m.max}</span></div>
+  <span class="note">Entrada ${fmt(m.entrada)} · pozo ${fmt(m.pozo||0)} · ${m.limite} puntos</span>
+  <span class="note">Suscriptos: ${(m.jugadores||[]).map(j=>esc(j.name)).join(', ')||'nadie todavía'}</span>
+  <button type="button" class="b2" style="color:var(--bad)" data-a="progcancel">Cancelar partida programada${m.entrada>0&&m.uids.length?' y devolver entradas':''}</button></div>`;
 }
 function estados(){
+  progv();
   FIJAS.forEach(([n])=>{const el=document.getElementById('st-'+n);if(!el)return;
     const m=fx.find(x=>x.id==='mesa-'+n);
     el.innerHTML=m?`${m.uids.length}/${m.max} sentados${m.uids.length?` <button type="button" class="b3" style="padding:4px 8px;color:var(--bad)" data-a="vaciar" data-id="${m.id}">Vaciar</button>`:''}`:'Sin crear';
   });
   const v=document.getElementById('viejas');
-  if(v){const o=fx.filter(m=>!/^mesa-[234]$/.test(m.id));
+  if(v){const o=fx.filter(m=>!/^mesa-(4|prog)$/.test(m.id));
     v.innerHTML=o.length?`<p class="note">Hay ${o.length} mesa(s) vieja(s) abierta(s).</p><button type="button" class="b2" data-a="viejas">Borrar mesas viejas</button>`:''}
 }
 async function guardarFijas(f){
@@ -119,7 +143,7 @@ async function guardarFijas(f){
     if(!(entrada>=0&&entrada<=100000)||!(limite>=20&&limite<=500)){fm={t:'Revisá la entrada (0 a 100000) y los puntos para eliminar (20 a 500).',bad:true};return view()}
     const ex=fx.find(x=>x.id==='mesa-'+n);
     if(ex&&ex.uids.length){bloq.push(nom);continue}
-    w.set(doc(db,'mesas','mesa-'+n),{nombre:nom,entrada,max:n,limite,listos:[],reeng:entrada===0?0:(cfg.reenganche>0?cfg.reenganche:entrada),pozo:0,fija:true,anfitrion:'',cuentaIni:serverTimestamp(),estado:'esperando',uids:[],jugadores:[],creada:serverTimestamp()});
+    w.set(doc(db,'mesas','mesa-'+n),{nombre:nom,entrada,max:n,limite,listos:[],reeng:entrada===0?0:(cfg.reenganche>0?cfg.reenganche:entrada),pozo:0,fija:true,prog:false,anfitrion:'',cuentaIni:serverTimestamp(),estado:'esperando',uids:[],jugadores:[],creada:serverTimestamp()});
     hubo++;
   }
   try{if(hubo)await w.commit();fm={t:'Mesas guardadas.'+(bloq.length?' No se cambió: '+bloq.join(', ')+' (tiene jugadores sentados).':''),bad:false}}
@@ -128,7 +152,7 @@ async function guardarFijas(f){
 }
 function rankCard(){
   return `<div class="card"><h2>Ranking</h2><div class="note" id="rkn"></div><div id="rkl"></div>
-  <button class="b1" data-a="png">Descargar ranking (PNG)</button>${navigator.canShare?'<button class="b2" data-a="share">Compartir por WhatsApp</button>':''}</div>`;
+  <button class="b1" data-a="png">Descargar ranking (PNG)</button><button class="b3" style="color:var(--bad)" data-a="limpiar">Limpiar ranking (poner en cero)</button>${navigator.canShare?'<button class="b2" data-a="share">Compartir por WhatsApp</button>':''}</div>`;
 }
 function rkv(){
   const el=document.getElementById('rkl');if(!el)return;const t=tabla();
@@ -170,9 +194,42 @@ async function dibujar(){
   return new Promise(r=>c.toBlob(r,'image/png'));
 }
 function pruebaCard(){
-  return `<div class="card"><h2>Mesa de prueba (bot)</h2><p class="note">Una mesa aparte, gratis, donde el usuario juega contra un bot. No usa saldo ni cuenta para el ranking.</p><div class="row"><b>${cfg.prueba?'ACTIVADA':'DESACTIVADA'}</b><button type="button" class="${cfg.prueba?'b2':'b1'}" data-a="prueba">${cfg.prueba?'Desactivar':'Activar'}</button></div></div>`;
+  return `<div class="card"><h2>Mesa de prueba (bot)</h2><p class="note">Una mesa aparte, gratis, donde el usuario juega contra un bot. No usa saldo ni suma al ranking.</p><div class="row"><b>${cfg.prueba?'ACTIVADA':'DESACTIVADA'}</b><button type="button" class="${cfg.prueba?'b2':'b1'}" data-a="prueba">${cfg.prueba?'Desactivar':'Activar'}</button></div></div>`;
+}
+async function guardarProg(f){
+  const ex=fx.find(x=>x.id==='mesa-prog');
+  if(ex&&ex.uids.length){pm={t:'Hay jugadores suscriptos. Cancelá la partida programada antes de programar otra.',bad:true};return view()}
+  const ini=new Date(f.get('ini')),entrada=Math.floor(+f.get('ep')),limite=Math.floor(+f.get('lp')),max=Math.floor(+f.get('mp'));
+  if(isNaN(ini.getTime())||ini.getTime()<Date.now()+60000){pm={t:'Elegí una fecha y hora futura (al menos 1 minuto desde ahora).',bad:true};return view()}
+  if(!(entrada>=0&&entrada<=100000)||!(limite>=20&&limite<=500)||!(max>=2&&max<=6)){pm={t:'Revisá la entrada (0 a 100000), los puntos (20 a 500) y los jugadores (2 a 6).',bad:true};return view()}
+  try{
+    await setDoc(doc(db,'mesas','mesa-prog'),{nombre:'Partida programada',entrada,max,limite,listos:[],reeng:entrada===0?0:(cfg.reenganche>0?cfg.reenganche:entrada),pozo:0,fija:true,prog:true,anfitrion:'',cuentaIni:serverTimestamp(),inicio:ini,estado:'esperando',uids:[],jugadores:[],creada:serverTimestamp()});
+    pm={t:'Partida programada.',bad:false};
+  }catch(x){pm={t:'No se pudo guardar. Revisá que hayas publicado las reglas nuevas de Firestore.',bad:true}}
+  view();
 }
 async function accion(a,b){
+  if(a==='limpiar'){
+    if(!rk.length){alert('El ranking ya está vacío.');return}
+    if(!confirm('¿Borrar TODO el ranking ('+rk.length+' jugadores)? No se puede deshacer.'))return;
+    if(!confirm('Última confirmación: el ranking queda en cero para todos. ¿Seguro?'))return;
+    b.disabled=true;
+    try{for(let i=0;i<rk.length;i+=400){const w=writeBatch(db);rk.slice(i,i+400).forEach(x=>w.delete(doc(db,'ranking',x.id)));await w.commit()}}
+    catch(x){alert('No se pudo limpiar el ranking. ¿Publicaste las reglas nuevas?')}
+    b.disabled=false;return;
+  }
+  if(a==='progcancel'){
+    const m=fx.find(x=>x.id==='mesa-prog');if(!m)return;
+    if(!confirm('¿Cancelar la partida programada?'+(m.entrada>0&&m.uids.length?' Se devuelve la entrada ('+fmt(m.entrada)+') a cada suscripto.':'')))return;
+    b.disabled=true;
+    try{
+      const w=writeBatch(db);
+      w.update(doc(db,'mesas','mesa-prog'),{uids:[],jugadores:[],pozo:0,listos:[],cuentaIni:serverTimestamp(),inicio:null});
+      if(m.entrada>0)m.uids.forEach(u=>w.update(doc(db,'users',u),{saldo:increment(m.entrada)}));
+      await w.commit();
+    }catch(x){alert('No se pudo cancelar.');b.disabled=false}
+    return;
+  }
   if(a==='prueba'){b.disabled=true;try{await setDoc(doc(db,'config','general'),{prueba:!cfg.prueba},{merge:true})}catch(x){alert('No se pudo cambiar.')}b.disabled=false;return}
   if(a==='png'||a==='share'){
     b.disabled=true;
@@ -203,7 +260,7 @@ async function accion(a,b){
     return;
   }
   if(a==='viejas'){
-    const l=fx.filter(m=>!/^mesa-[234]$/.test(m.id));if(!l.length)return;
+    const l=fx.filter(m=>!/^mesa-(4|prog)$/.test(m.id));if(!l.length)return;
     if(!confirm('¿Borrar '+l.length+' mesa(s) vieja(s)? Se devuelven las entradas a quienes estén sentados.'))return;
     b.disabled=true;
     try{
@@ -256,6 +313,7 @@ document.addEventListener('input',e=>{if(e.target.id==='q'){q=e.target.value;lis
 document.addEventListener('submit',async e=>{
   e.preventDefault();const f=new FormData(e.target);err='';ok='';
   if(e.target.id==='mf')return guardarFijas(f);
+  if(e.target.id==='pf')return guardarProg(f);
   try{
     if(e.target.id==='f')await signInWithEmailAndPassword(auth,f.get('email'),f.get('pass'));
     if(e.target.id==='cf'){
@@ -270,7 +328,7 @@ document.addEventListener('submit',async e=>{
 document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a;
   if(a==='salir')return signOut(auth);
-  if(['png','share','vaciar','viejas','prueba'].includes(a))return accion(a,b);
+  if(['png','share','vaciar','viejas','prueba','limpiar','progcancel'].includes(a))return accion(a,b);
   if(a==='blq'||a==='del'){
     const u=us.find(x=>x.id===b.dataset.u);if(!u||u.admin)return;
     if(a==='blq'){

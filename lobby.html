@@ -195,13 +195,13 @@ async function registrarStats(id){
       const d=(await t.get(ref)).data(),g=d&&d.g;
       if(!g||d.prueba||!g.ganador||g.reg)return;
       g.reg=true;
-      g.orden.forEach(u=>t.set(doc(db,'ranking',u),{name:g.nombres[u],jugadas:increment(1),ganadas:increment(u===g.ganador?1:0),perdidas:increment(u===g.ganador?0:1)},{merge:true}));
+      if(d.entrada>0)g.orden.forEach(u=>t.set(doc(db,'ranking',u),{name:g.nombres[u],jugadas:increment(1),ganadas:increment(u===g.ganador?1:0),perdidas:increment(u===g.ganador?0:1)},{merge:true}));
       t.update(ref,{g});
     });
   }catch(e){}
 }
-const CUENTA=30,CUENTA_LLENA=10;
-const cuenta=m=>{const t=m.cuentaIni&&m.cuentaIni.toMillis?m.cuentaIni.toMillis():0;if(!t)return 999;const seg=m.uids.length>=m.max?CUENTA_LLENA:CUENTA;return Math.ceil((t+seg*1000-Date.now())/1000)};
+const CUENTA=20;
+const cuenta=m=>{const t=m.cuentaIni&&m.cuentaIni.toMillis?m.cuentaIni.toMillis():0;if(!t)return 999;const seg=CUENTA;return Math.ceil((t+seg*1000-Date.now())/1000)};
 setInterval(()=>{
   if(!U||!mia||mia.estado!=='esperando'||mia.uids.length<2)return;
   const r=cuenta(mia),el=document.getElementById('cdw');
@@ -209,7 +209,10 @@ setInterval(()=>{
   if(r<=0)autoIniciar();
 },1000);
 let dej=new Set();try{dej=new Set(JSON.parse(localStorage.getItem('dej')||'[]'))}catch(e){}
-const buscarMia=()=>mesas.find(m=>m.uids.includes(U.uid)&&!dej.has(m.id))||null;
+const buscarMia=()=>{const l=mesas.filter(m=>m.uids.includes(U.uid)&&!dej.has(m.id)&&!(m.prog&&m.estado==='esperando'));return l.find(m=>m.estado==='jugando')||l[0]||null};
+const progMesa=()=>mesas.find(m=>m.id==='mesa-prog'&&m.estado==='esperando')||null;
+const bloqueaPrincipal=()=>{const p=progMesa();return !!(p&&p.inicio&&p.uids.includes(U.uid)&&p.inicio.toMillis()<=Date.now()+15*60000)};
+const dur=s=>{const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),x=s%60,p=n=>String(n).padStart(2,'0');return (d?d+'d ':'')+p(h)+':'+p(m)+':'+p(x)};
 function dejar(id){dej.add(id);try{localStorage.setItem('dej',JSON.stringify([...dej].slice(-30)))}catch(e){}mia=buscarMia();sel=null;err='';view()}
 /* Registro de partidas del día (lo lee el panel de administrador) */
 const regL={};
@@ -227,6 +230,27 @@ async function registrarLog(id){
     });
   }catch(e){}
 }
+let iniP=false;
+async function iniciarProg(){
+  if(iniP)return;iniP=true;
+  try{const ref=doc(db,'mesas','mesa-prog');
+    await runTransaction(db,async t=>{const d=(await t.get(ref)).data();
+      if(!d||d.estado!=='esperando'||!d.prog||!d.inicio||d.uids.length<2||d.inicio.toMillis()>Date.now())return;
+      const nref=doc(collection(db,'mesas'));
+      const {cuentaIni,ultima,...resto}=d;
+      t.set(nref,{...resto,fija:false,origen:'mesa-prog',estado:'jugando',g:armarG(d),iniciada:serverTimestamp()});
+      t.update(ref,{uids:[],jugadores:[],pozo:0,listos:[],cuentaIni:serverTimestamp(),ultima:nref.id,inicio:null});
+    });
+  }catch(e){}
+  setTimeout(()=>{iniP=false},4000);
+}
+setInterval(()=>{
+  if(!U||!me)return;const p=progMesa();if(!p||!p.inicio)return;
+  const el=document.getElementById('cdp');
+  if(el){const r=Math.ceil((p.inicio.toMillis()-Date.now())/1000);el.textContent=r>0?dur(r):(p.uids.length>=2?'Empezando…':'Esperando más jugadores')}
+  if(mia||busy||!p.uids.includes(U.uid)||p.uids.length<2||p.inicio.toMillis()>Date.now())return;
+  iniciarProg();
+},1000);
 let iniciando=null;
 async function autoIniciar(){
   const m=mia;if(iniciando===m.id)return;iniciando=m.id;
@@ -393,7 +417,7 @@ function view(){
 }
 function authView(){
   const reg=modo==='up';
-  return `<h1 style="margin:0"><img class="logo g" src="logo.png" alt="Chinchón Online"></h1><p class="note" style="text-align:center">Mesas las 24hs, 3 y 4 jugadores. Mesa de prueba gratis.</p>
+  return `<h1 style="margin:0"><img class="logo g" src="logo.png" alt="Chinchón Online"></h1><p class="note" style="text-align:center">Mesa principal las 24 hs, partidas programadas y mesa de prueba gratis.</p>
   <div class="tabs"><button class="${reg?'':'on'}" data-a="modo" data-v="in">Entrar</button><button class="${reg?'on':''}" data-a="modo" data-v="up">Crear cuenta</button></div>
   <form class="card" id="f">
     ${reg?'<input name="nombre" placeholder="Tu nombre en la mesa" maxlength="16" required autocomplete="nickname">':''}
@@ -418,27 +442,45 @@ function rankHTML(){
   const t=tabla(),yo=t.findIndex(x=>x.id===U.uid);
   const mio=yo>=0
     ?`<div class="card"><div class="row"><h2>Tu posición</h2><span class="mono gold">#${yo+1}</span></div><div class="row note"><span>Jugadas <b class="mono">${t[yo].j}</b></span><span>Ganadas <b class="mono" style="color:var(--ok)">${t[yo].g}</b></span><span>Perdidas <b class="mono" style="color:var(--bad)">${t[yo].p}</b></span></div></div>`
-    :'<div class="card"><p class="note">Todavía no jugaste ninguna partida. Jugá una para entrar al ranking.</p></div>';
+    :'<div class="card"><p class="note">Todavía no jugaste ninguna partida. Jugá una partida con entrada para entrar al ranking (las gratis no suman).</p></div>';
   const fila=(x,i)=>`<div class="row" style="padding:9px 0;border-top:1px solid var(--line);${x.id===U.uid?'color:var(--gold)':''}"><span class="mono" style="width:30px">${i<3?['🥇','🥈','🥉'][i]:i+1}</span><b style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.name)}</b><span class="mono" style="font-size:12px">${x.j} · ${x.g} · ${x.p} · ${pc(x)}</span></div>`;
-  return mio+`<div class="card"><h2>Mejores jugadores</h2><div class="note">Columnas: Jugadas · Ganadas · Perdidas · % de victorias</div>${t.length?t.slice(0,30).map(fila).join(''):'<p class="note">Todavía no hay partidas registradas.</p>'}</div>`;
+  return mio+`<div class="card"><h2>Mejores jugadores</h2><div class="note">Columnas: Jugadas · Ganadas · Perdidas · % de victorias. Las partidas gratis no suman.</div>${t.length?t.slice(0,30).map(fila).join(''):'<p class="note">Todavía no hay partidas registradas.</p>'}</div>`;
 }
 function pruebaHTML(){
   return cfg.prueba?`<div class="card"><h2>🤖 Mesa de prueba</h2><p class="note">Jugá una partida de práctica contra un bot. Es gratis y no cuenta para el ranking.</p><button class="b2" data-a="bot" ${busy?'disabled':''}>Jugar contra el bot</button></div>`:'';
 }
 function mesasHTML(){return mesasFijasHTML()+pruebaHTML()}
 function mesasFijasHTML(){
-  const ab=mesas.filter(m=>m.estado==='esperando'&&m.fija&&/^mesa-\d$/.test(m.id)).sort((a,b)=>a.max-b.max);
-  const jug=mesas.filter(m=>m.estado==='jugando').length;
-  if(!ab.length)return `<p class="note">${me.admin?'Todavía no están creadas las 3 mesas. Creálas desde el Panel de administrador.':'Las mesas todavía no están disponibles. Probá en unos minutos.'}</p>`;
-  return ab.map(m=>{
-    const llena=m.uids.length>=m.max,falta=me.saldo<m.entrada;
-    return `<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="mono gold">${m.uids.length}/${m.max}</span></div>
+  const m=mesas.find(x=>x.id==='mesa-4'&&x.estado==='esperando'&&x.fija);
+  const jug=mesas.filter(x=>x.estado==='jugando').length;
+  return principalHTML(m)+progHTML()+(jug?`<p class="note" style="text-align:center">${jug} partida${jug===1?'':'s'} en juego ahora</p>`:'');
+}
+function principalHTML(m){
+  if(!m)return `<div class="card"><h2>Mesa principal</h2><p class="note">${me.admin?'Todavía no está creada. Creala desde el Panel de administrador.':'La mesa todavía no está disponible. Probá en unos minutos.'}</p></div>`;
+  const llena=m.uids.length>=m.max,falta=me.saldo<m.entrada,blq=bloqueaPrincipal();
+  return `<div class="card"><div class="row"><h2>${esc(m.nombre||'Mesa principal')}</h2><span class="mono gold">${m.uids.length}/${m.max}</span></div>
     <div class="row"><span class="note">Se elimina a los ${m.limite} puntos</span></div>
     <div class="row"><span class="note">Entrada</span><span class="mono">${ent(m.entrada)}</span></div>
     <div class="row"><span class="note">Pozo</span><span class="mono gold">${fmt(neto(m.pozo))}</span></div>
+    <p class="note">Empieza sola 20 segundos después de que se sienta el segundo jugador. Si entra otro, la cuenta vuelve a empezar.</p>
     ${m.jugadores.length?`<div class="note">Sentados: ${m.jugadores.map(j=>esc(j.name)).join(', ')}</div>`:''}
-    <button class="b1" data-a="unirse" data-id="${m.id}" ${busy||llena||falta?'disabled':''}>${falta?'Saldo insuficiente':llena?'Mesa llena':'Jugar'}</button></div>`}).join('')
-  +(jug?`<p class="note" style="text-align:center">${jug} partida${jug===1?'':'s'} en juego ahora</p>`:'');
+    ${blq?'<div class="err">Estás suscripto a la partida programada y está por empezar: no podés sentarte en esta mesa ahora.</div>':''}
+    <button class="b1" data-a="unirse" data-id="${m.id}" ${busy||llena||falta||blq?'disabled':''}>${falta?'Saldo insuficiente':llena?'Mesa llena':'Jugar'}</button></div>`;
+}
+function progHTML(){
+  const p=progMesa();
+  if(!p||!p.inicio)return `<div class="card"><h2>📅 Partida programada</h2><p class="note">Por ahora no hay ninguna partida programada. Cuando el administrador programe una, te vas a poder suscribir desde acá.</p></div>`;
+  const ya=p.uids.includes(U.uid),llena=p.uids.length>=p.max,falta=me.saldo<p.entrada,cerr=p.inicio.toMillis()<=Date.now()&&p.uids.length>=2;
+  const cuando=p.inicio.toDate().toLocaleString('es-AR',{weekday:'long',day:'2-digit',month:'long',hour:'2-digit',minute:'2-digit'});
+  const lbl=ya?'Estás suscripto ✔':cerr?'Inscripción cerrada':llena?'Cupo completo':falta?'Saldo insuficiente':'Suscribirme';
+  return `<div class="card"><div class="row"><h2>📅 Partida programada</h2><span class="mono gold">${p.uids.length}/${p.max}</span></div>
+    <div class="row"><span class="note">Empieza</span><b style="text-align:right">${esc(cuando)}</b></div>
+    <div class="row"><span class="note">Falta</span><span id="cdp" class="mono gold"></span></div>
+    <div class="row"><span class="note">Se elimina a los ${p.limite} puntos · Entrada</span><span class="mono">${ent(p.entrada)}</span></div>
+    <div class="row"><span class="note">Pozo</span><span class="mono gold">${fmt(neto(p.pozo))}</span></div>
+    ${p.jugadores.length?`<div class="note">Suscriptos: ${p.jugadores.map(j=>esc(j.name)).join(', ')}</div>`:''}
+    <p class="note">Al suscribirte se descuenta la entrada. Después podés salir y jugar otras partidas, pero no podés cancelar la suscripción: solo el administrador puede cancelar la partida (y te devuelve la entrada). Se juega con 2 o más suscriptos; entrá al lobby a la hora para que arranque.</p>
+    <button class="b1" data-a="unirse" data-id="${p.id}" ${busy||ya||llena||falta||cerr?'disabled':''}>${lbl}</button></div>`;
 }
 function lobbyView(){
   const wa=cfg.whatsapp?`<a class="b1" target="_blank" rel="noopener" href="https://wa.me/${cfg.whatsapp}?text=${encodeURIComponent('Hola, quiero cargar fichas. Mi usuario: '+me.name+' (código '+U.uid.slice(0,6)+')')}">Cargar saldo por WhatsApp</a>`:'';
@@ -481,6 +523,11 @@ document.addEventListener('click',async e=>{
   if(a==='salir')return signOut(auth);
   if(a==='snd'){sonido=!sonido;try{localStorage.setItem('snd',sonido?'1':'0')}catch(e){}if(sonido)sonar('inicio');return view()}
   if(['robar','tirar','cerrar','sig','reeng','cobrar','ready','sel','fin','aband','volver'].includes(a))return juego(a,b);
+  if(a==='unirse'){
+    const mm=mesas.find(x=>x.id===b.dataset.id);
+    if(mm&&mm.prog&&!confirm('Se te descuenta la entrada ('+ent(mm.entrada)+') y NO podés cancelar la suscripción. Solo el administrador puede cancelar la partida. ¿Confirmás?'))return;
+    if(mm&&!mm.prog&&bloqueaPrincipal()){err='Estás suscripto a la partida programada y está por empezar.';return view()}
+  }
   err='';busy=true;view();
   try{
     const uref=doc(db,'users',U.uid),batch=writeBatch(db);
