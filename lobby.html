@@ -479,7 +479,7 @@ function progHTML(){
     <div class="row"><span class="note">Se elimina a los ${p.limite} puntos · Entrada</span><span class="mono">${ent(p.entrada)}</span></div>
     <div class="row"><span class="note">Pozo</span><span class="mono gold">${fmt(neto(p.pozo))}</span></div>
     ${p.jugadores.length?`<div class="note">Suscriptos: ${p.jugadores.map(j=>esc(j.name)).join(', ')}</div>`:''}
-    <p class="note">Al suscribirte. Ppodés seguir jugando otras partidas hasta el comienzo de la partida programada, pero no podés cancelar la suscripción: Se juega con 2 o más suscriptos; entrá a la mesa a la hora para que arranque.</p>
+    <p class="note">Al suscribirte. Podés seguir jugando otras partidas, pero no podés cancelar la suscripción: Se juega con 2 o más suscriptos; entrá a la mesa a la hora programada para el arranque.</p>
     <button class="b1" data-a="unirse" data-id="${p.id}" ${busy||ya||llena||falta||cerr?'disabled':''}>${lbl}</button></div>`;
 }
 function lobbyView(){
