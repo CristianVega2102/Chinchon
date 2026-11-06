@@ -94,42 +94,6 @@ a.b1{text-decoration:none;text-align:center;display:block;border-radius:14px;pad
 .prb .tx{font-size:13px;color:var(--ink)}.prb .tx small{display:block;color:var(--mute);font-size:12px;margin-top:2px}
 .prb .cta{grid-column:1/3}
 @media (prefers-reduced-motion:reduce){.prog .cdn{animation:none}}
-/* ---------- Mesa de juego: mismo estilo que el lobby ---------- */
-body:has(.gm){background:radial-gradient(110% 60% at 50% 0%,#14522f 0%,#0b2b1b 50%,#071a10 100%) fixed}
-.gm{display:flex;flex-direction:column;gap:12px}
-.gm .card{border-color:#8a7330;background:linear-gradient(180deg,#123a24,#0c2a1a)}
-.gm .pozo{background:linear-gradient(180deg,#14452a,#0f2f1d);border:1.5px solid #c9a23c;border-radius:18px;padding:12px 16px;box-shadow:0 0 14px rgba(242,193,78,.18)}
-.gm .mn{color:var(--gold);font-weight:700;font-size:15px}.gm .mn b{font-family:var(--sans);font-size:15px;color:var(--gold)}
-.gm .pz2{display:flex;flex-direction:column;align-items:flex-end;line-height:1.1}
-.gm .pz2 .note{font-size:14px;color:var(--ink);font-weight:700}
-.gm .pz2 b{font-size:28px}.gm .pz2 b::before{content:'🪙 ';font-size:24px}
-.pls{display:grid;gap:10px}
-.gm .seat{position:relative;min-height:0;padding:14px 6px;border-radius:20px;border:1.5px solid #8a7330;background:linear-gradient(180deg,#123a24,#0c2a1a);gap:4px;box-shadow:inset 0 0 18px rgba(0,0,0,.35)}
-.gm .seat.me{border-color:var(--gold);box-shadow:0 0 14px rgba(242,193,78,.45),inset 0 0 18px rgba(0,0,0,.3)}
-.gm .av{width:58px;height:58px;font-size:24px;font-weight:800;background:radial-gradient(circle at 35% 30%,#3b7a58,#1b4a33);border:3px solid #d8b24a;box-shadow:0 0 10px rgba(242,193,78,.4)}
-.gm .seat b{font-size:16px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.gm .sc{font-size:30px;font-weight:800;color:var(--gold);line-height:1.1}.gm .sc small{font-size:16px;font-weight:700;color:var(--gold)}
-.gm .trf{position:absolute;top:8px;right:10px;font-size:22px}
-.pls.n3 .av,.pls.n4 .av{width:44px;height:44px;font-size:18px}
-.pls.n3 .sc{font-size:22px}.pls.n4 .sc{font-size:20px}
-.pls.n3 .sc small,.pls.n4 .sc small{font-size:12px}
-.pls.n3 .seat b,.pls.n4 .seat b{font-size:13px}.pls.n4 .trf{top:4px;right:6px;font-size:16px}
-.gm .mesa{border:2px solid var(--gold);border-radius:22px;padding:16px;gap:12px;box-shadow:0 0 22px rgba(242,193,78,.3);
-  background:radial-gradient(circle at 10% 34%,rgba(242,193,78,.85) 0 1.5px,transparent 2.5px),radial-gradient(circle at 90% 22%,rgba(242,193,78,.7) 0 1.5px,transparent 2.5px),radial-gradient(circle at 78% 70%,rgba(242,193,78,.8) 0 1.5px,transparent 2.5px),radial-gradient(circle at 20% 82%,rgba(242,193,78,.6) 0 1.5px,transparent 2.5px),radial-gradient(circle at 94% 56%,rgba(242,193,78,.6) 0 1px,transparent 2px),linear-gradient(125deg,transparent 0 55%,rgba(255,255,255,.05) 55% 78%,transparent 78%),radial-gradient(120% 110% at 50% 0%,#17502f,#0d2a1a)}
-.mesa .mh{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
-.mesa .mh b{font-size:19px;line-height:1.25}
-.mesa #cd{font-size:22px;color:var(--gold)}
-.mesa .note{color:#cfe0d4;font-size:14px}
-.mesa .piles{gap:34px;padding:4px 0}
-.mesa .piles .gc{width:clamp(92px,28vw,120px);max-width:none;flex:none;border-radius:10px;box-shadow:0 6px 14px rgba(0,0,0,.5)}
-.gm .hand{gap:8px;padding-top:10px;justify-content:center}
-.gm .hand .gc{flex:1 1 0;min-width:0;max-width:calc(25% - 6px);border-radius:12px;border:2px solid #efe3c2;box-shadow:0 4px 10px rgba(0,0,0,.45)}
-.gm .hand .gc.sel{transform:translateY(-8px);box-shadow:0 0 0 3px var(--gold),0 8px 14px rgba(0,0,0,.5)}
-.pbtn{width:100%;border-radius:999px;font-size:19px;font-weight:800;padding:15px;letter-spacing:.2px}
-.pbtn.gd{background:linear-gradient(180deg,#ffe27a,#d99a12);color:#2a2100;border:1.5px solid #fff1b0;box-shadow:0 4px 12px rgba(242,193,78,.35)}
-.pbtn.gn{background:linear-gradient(180deg,#1f7a46,#124a2b);color:var(--gold);border:1.5px solid #c9a23c;box-shadow:0 4px 12px rgba(0,0,0,.35)}
-.pbtn:disabled{opacity:.45;box-shadow:none}
-.wm{position:fixed;right:8px;bottom:6px;width:96px;height:auto;pointer-events:none;z-index:5;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6))}
 </style>
 </head>
 <body>
@@ -481,8 +445,7 @@ const mini=n=>{const c=dc(n);return `<span class="mc ${c.j?'j':''}">${c.j?'🃏'
 function juegoView(){
   const m=mia,g=m.g,u=U.uid,yo=g.manos[u]||[],mi=g.orden[g.turno]===u&&g.fase!=='resumen',fuera=!!g.fuera[u];
   const nom=x=>esc(g.nombres[x]);
-  const _ps=g.orden.filter(x=>!g.fuera[x]).map(x=>g.puntos[x]),_lo=Math.min(..._ps),_hi=Math.max(..._ps);
-  const ops=[u,...g.orden.filter(x=>x!==u)].map(x=>`<div class="seat ${g.orden[g.turno]===x&&g.fase!=='resumen'?'me':''}" style="${g.fuera[x]?'opacity:.45':''}">${_ps.length>1&&_lo<_hi&&!g.fuera[x]&&g.puntos[x]===_lo?'<span class="trf" aria-label="Va ganando">🏆</span>':''}<div class="av">${esc(g.nombres[x][0].toUpperCase())}</div><b>${x===u?'Vos':nom(x)}</b><span class="mono sc">${g.puntos[x]}<small>/${g.limite}</small></span>${g.fuera[x]?'<span class="tag">Eliminado</span>':''}</div>`).join('');
+  const ops=[u,...g.orden.filter(x=>x!==u)].map(x=>`<div class="seat ${g.orden[g.turno]===x&&g.fase!=='resumen'?'me':''}" style="min-height:0;padding:10px 4px;${g.fuera[x]?'opacity:.45':''}"><div class="av" style="width:40px;height:40px;font-size:16px">${esc(g.nombres[x][0].toUpperCase())}</div><b style="font-size:13px">${x===u?'Vos':nom(x)}</b><span class="mono gold" style="font-size:22px;font-weight:800;line-height:1.1">${g.puntos[x]}<small style="font-size:13px;font-weight:600">/${g.limite}</small></span>${g.fuera[x]?'<span class="tag">Eliminado</span>':''}</div>`).join('');
   const msg=g.fase==='resumen'?'Fin de la mano':fuera?'Estás eliminado. Podés mirar la partida.':mi?(g.fase==='robar'?'Tu turno: sacá del mazo o del descarte':'Elegí una carta para descartar o cerrar'):'Juega '+nom(g.orden[g.turno])+'…';
   const top=g.desc[g.desc.length-1],OR=ordenar(yo),mk=OR.col;
   const hs=fuera?[]:OR.cartas.map(n=>gcard(n,(sel===n?'sel ':'')+(g.nuevo===n?'nw':''),`data-a="sel" data-c="${n}" role="button" tabindex="0"`).replace(/<\/div>$/,mk[n]?`<i style="background:${mk[n]}"></i></div>`:'</div>'));
@@ -499,15 +462,14 @@ function juegoView(){
       bt=`<h2>${nom(R.cerro)} cerró la mano</h2>`+ven+(fuera?`<button class="b2" data-a="reeng" ${busy||me.saldo<(m.reeng||m.entrada)?'disabled':''}>Reengancharse ${(m.reeng||m.entrada)?'por '+fmt(m.reeng||m.entrada):'gratis'}</button>`:'')+(fuera?'':`<p class="note">Tenés <b id="cdr" class="mono gold">${Math.max(0,Math.ceil((g.venceR-Date.now())/1000))}s</b> para tocar Listo, o perdés la partida.</p>`)+`<button class="b1" data-a="sig" ${busy||fuera||(g.listosR||{})[u]?'disabled':''}>${(g.listosR||{})[u]?'Esperando a los demás':'Listo para la siguiente mano'} (${Object.keys(g.listosR||{}).length}/${g.orden.filter(x=>!g.fuera[x]).length})</button>`;}
     res=`<div class="card">${bt}${filas}</div>`;
   }
-  return `<div class="gm">${head()}<div class="pozo"><span class="mn">${esc(m.nombre)} · Entrada <b>${fmt(m.entrada)}</b></span><div class="pz2"><span class="note">Pozo</span><b>${fmt(neto(m.pozo))}</b></div></div>
-  <div class="pls n${Math.min(g.orden.length,4)}" style="grid-template-columns:repeat(${g.orden.length<=4?g.orden.length:3},1fr)">${ops}</div>
-  <div class="card mesa"><div class="mh"><b>${msg}</b>${g.fase==='resumen'?'':`<span id="cd" class="mono gold">${Math.max(0,Math.ceil((g.vence-Date.now())/1000))}s</span>`}</div>${err?`<div class="err">${err}</div>`:''}
+  return `${head()}<div class="pozo"><span class="note">${esc(m.nombre)} · Entrada ${fmt(m.entrada)}</span><div style="text-align:right"><span class="note">Pozo</span><br><b>${fmt(neto(m.pozo))}</b></div></div>
+  <div style="display:grid;grid-template-columns:repeat(${g.orden.length<=4?g.orden.length:3},1fr);gap:8px">${ops}</div>
+  <div class="card"><div class="row" style="justify-content:center"><b>${msg}</b>${g.fase==='resumen'?'':`<span id="cd" class="mono gold">${Math.max(0,Math.ceil((g.vence-Date.now())/1000))}s</span>`}</div>${err?`<div class="err">${err}</div>`:''}
     <div class="piles"><div class="gc back ${mi&&g.fase==='robar'?'go':''}" data-a="robar" data-f="mazo" role="button" tabindex="0" aria-label="Sacar del mazo"></div>${gcard(top,mi&&g.fase==='robar'?'go':'',`data-a="robar" data-f="desc" role="button" tabindex="0" aria-label="Levantar del descarte"`)}</div>
     <div class="note" style="text-align:center">Mazo ${g.mazo.length} · Se elimina a los ${g.limite} puntos</div></div>
   ${res}${hand}
-  <div class="acts"><button class="pbtn gd" data-a="tirar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy?'':'disabled'}>Descartar</button><button class="pbtn gn" data-a="cerrar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy&&canClose(yo,sel)?'':'disabled'}>Cerrar mano</button></div>
-  ${g.ganador||fuera?'':'<button class="b3" data-a="aband">Abandonar partida</button>'}${fuera&&!g.ganador?'<button class="b1" data-a="volver">Volver al lobby</button>':''}
-  <div style="height:44px"></div></div><img class="wm" src="logo.png" alt="">`;
+  <div class="acts"><button class="b2" data-a="tirar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy?'':'disabled'}>Descartar</button><button class="b1" data-a="cerrar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy&&canClose(yo,sel)?'':'disabled'}>Cerrar mano</button></div>
+  ${g.ganador||fuera?'':'<button class="b3" data-a="aband">Abandonar partida</button>'}${fuera&&!g.ganador?'<button class="b1" data-a="volver">Volver al lobby</button>':''}`;
 }
 let sel=null;const pref={ent:'',max:'4',lim:'100',sit:'si'};let cfg={comision:10,entradas:[500,1000,2000],turno:20,espera:40,reenganche:0,segReeng:20,whatsapp:''};
 
