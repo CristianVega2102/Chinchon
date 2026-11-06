@@ -193,6 +193,39 @@ async function dibujar(){
   x.fillText('JUG = jugadas · GAN = ganadas · PER = perdidas',W/2,H-80);
   return new Promise(r=>c.toBlob(r,'image/png'));
 }
+async function dibujarDia(){
+  const MAXF=100,l=pd.slice(0,MAXF),extra=pd.length-l.length;
+  const re=pd.filter(x=>!x.prueba),np=pd.length-re.length;
+  const pozo=re.reduce((s,x)=>s+(x.pozo||0),0),prem=re.reduce((s,x)=>s+(x.premio||0),0);
+  try{await Promise.all([document.fonts.load('800 40px "Plus Jakarta Sans"'),document.fonts.load('700 30px "JetBrains Mono"')])}catch(e){}
+  const SANS='"Plus Jakarta Sans",system-ui,sans-serif',MONO='"JetBrains Mono",ui-monospace,monospace';
+  const W=1080,RH=150,TOP=470,H=TOP+Math.max(l.length,1)*RH+(extra>0?70:0)+90;
+  const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+  x.fillStyle='#0e1b15';x.fillRect(0,0,W,H);
+  x.fillStyle='#15271e';rr(x,30,30,W-60,H-60,36);x.fill();x.strokeStyle='#22392d';x.lineWidth=3;x.stroke();
+  x.textBaseline='middle';x.textAlign='center';
+  const [yy,mm,dd]=diaSel.split('-').map(Number);
+  x.fillStyle='#f2c14e';x.font='800 62px '+SANS;x.fillText('📋 PARTIDAS DEL DÍA',W/2,120);
+  x.fillStyle='#8fa597';x.font='600 32px '+SANS;x.fillText(new Date(yy,mm-1,dd).toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}),W/2,195);
+  /* resumen */
+  x.fillStyle='#1a3025';rr(x,60,250,W-120,170,24);x.fill();
+  const cols=[['PARTIDAS',String(re.length),'#e8f0ea'],['POZO',fmt(pozo),'#e8f0ea'],['PREMIOS',fmt(prem),'#5fd08a'],['COMISIÓN',fmt(pozo-prem),'#f2c14e']];
+  cols.forEach((k,i)=>{const cx=60+(W-120)/8+i*(W-120)/4;x.fillStyle='#8fa597';x.font='700 24px '+SANS;x.fillText(k[0],cx,300);x.fillStyle=k[2];x.font='700 34px '+MONO;x.fillText(k[1],cx,360)});
+  if(np){x.fillStyle='#8fa597';x.font='600 24px '+SANS;x.fillText('🤖 '+np+' partida'+(np===1?'':'s')+' de prueba (no suman en los totales)',W/2,445)}
+  const cut=(t,w)=>{if(x.measureText(t).width<=w)return t;while(t.length>1&&x.measureText(t+'…').width>w)t=t.slice(0,-1);return t+'…'};
+  if(!l.length){x.fillStyle='#8fa597';x.font='600 34px '+SANS;x.fillText('No hay partidas registradas ese día',W/2,TOP+RH/2)}
+  l.forEach((p,i)=>{
+    const y=TOP+i*RH;
+    if(i%2===0){x.fillStyle='#1a3025';rr(x,60,y,W-120,RH-10,18);x.fill()}
+    const h=p.fecha&&p.fecha.toDate?p.fecha.toDate().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):'';
+    x.textAlign='left';x.fillStyle='#e8f0ea';x.font='800 34px '+SANS;x.fillText(cut(h+' · '+(p.prueba?'🤖 ':'')+(p.mesa||'Mesa'),620),90,y+34);
+    x.textAlign='right';x.fillStyle='#f2c14e';x.font='700 34px '+MONO;x.fillText(p.prueba?'PRUEBA':fmt(p.pozo||0),W-90,y+34);
+    x.textAlign='left';x.fillStyle='#8fa597';x.font='600 26px '+SANS;x.fillText(cut('Jugaron: '+(p.jugadores||[]).join(', '),W-180),90,y+78);
+    x.fillStyle='#5fd08a';x.font='700 28px '+SANS;x.fillText(cut('🏆 Ganó '+(p.ganador||'?')+(p.prueba?'':' · premio '+fmt(p.premio||0)),W-180),90,y+116);
+  });
+  if(extra>0){x.textAlign='center';x.fillStyle='#8fa597';x.font='600 26px '+SANS;x.fillText('… y '+extra+' partida'+(extra===1?'':'s')+' más (se ven en el panel)',W/2,TOP+l.length*RH+30)}
+  return new Promise(r=>c.toBlob(r,'image/png'));
+}
 function pruebaCard(){
   return `<div class="card"><h2>Mesa de prueba (bot)</h2><p class="note">Una mesa aparte, gratis, donde el usuario juega contra un bot. No usa saldo ni suma al ranking.</p><div class="row"><b>${cfg.prueba?'ACTIVADA':'DESACTIVADA'}</b><button type="button" class="${cfg.prueba?'b2':'b1'}" data-a="prueba">${cfg.prueba?'Desactivar':'Activar'}</button></div></div>`;
 }
@@ -231,6 +264,23 @@ async function accion(a,b){
     return;
   }
   if(a==='prueba'){b.disabled=true;try{await setDoc(doc(db,'config','general'),{prueba:!cfg.prueba},{merge:true})}catch(x){alert('No se pudo cambiar.')}b.disabled=false;return}
+  if(a==='pngdia'||a==='sharedia'){
+    if(!pd.length){alert('No hay partidas registradas ese día.');return}
+    b.disabled=true;
+    try{
+      const blob=await dibujarDia(),nom='partidas-chinchon-'+diaSel+'.png';
+      if(a==='sharedia'){
+        const f=new File([blob],nom,{type:'image/png'});
+        if(navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],title:'Partidas del día'});
+        else alert('Este navegador no puede compartir imágenes. Usá el botón Descargar.');
+      }else{
+        const url=URL.createObjectURL(blob),l=document.createElement('a');
+        l.href=url;l.download=nom;document.body.appendChild(l);l.click();l.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),5000);
+      }
+    }catch(x){if(!x||x.name!=='AbortError')alert('No se pudo generar la imagen.')}
+    b.disabled=false;return;
+  }
   if(a==='png'||a==='share'){
     b.disabled=true;
     try{
@@ -284,17 +334,19 @@ function subPartidas(){
 function partidasCard(){
   return `<div class="card"><h2>Partidas del día</h2>
   <label>Día<input id="dia" type="date" value="${diaSel}" max="${hoyStr()}"></label>
-  <div class="note" id="ptn"></div><div id="ptl"></div></div>`;
+  <div class="note" id="ptn"></div><div id="ptl"></div>
+  <button class="b1" data-a="pngdia">Descargar resultados del día (PNG)</button>${navigator.canShare?'<button class="b2" data-a="sharedia">Compartir por WhatsApp</button>':''}</div>`;
 }
 function ptv(){
   const el=document.getElementById('ptl'),nt=document.getElementById('ptn');if(!el)return;
-  const pozo=pd.reduce((s,x)=>s+(x.pozo||0),0),prem=pd.reduce((s,x)=>s+(x.premio||0),0);
-  nt.innerHTML=pd.length?`<b class="mono gold">${pd.length}</b> partida${pd.length===1?'':'s'} · pozo total <b class="mono">${fmt(pozo)}</b> · premios <b class="mono">${fmt(prem)}</b> · comisión de la casa <b class="mono gold">${fmt(pozo-prem)}</b>`:'';
+  const re=pd.filter(x=>!x.prueba),np=pd.length-re.length;
+  const pozo=re.reduce((s,x)=>s+(x.pozo||0),0),prem=re.reduce((s,x)=>s+(x.premio||0),0);
+  nt.innerHTML=pd.length?`<b class="mono gold">${re.length}</b> partida${re.length===1?'':'s'} · pozo total <b class="mono">${fmt(pozo)}</b> · premios <b class="mono">${fmt(prem)}</b> · comisión de la casa <b class="mono gold">${fmt(pozo-prem)}</b>${np?` · 🤖 ${np} de prueba (no suman)`:''}`:'';
   el.innerHTML=pd.length?pd.map(x=>{
     const h=x.fecha&&x.fecha.toDate?x.fecha.toDate().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):'';
-    return `<div class="u"><div class="row"><b>${h} · ${esc(x.mesa||'Mesa')}</b><span class="mono gold">${fmt(x.pozo||0)}</span></div>
+    return `<div class="u"><div class="row"><b>${h} · ${x.prueba?'🤖 ':''}${esc(x.mesa||'Mesa')}</b><span class="mono gold">${x.prueba?'PRUEBA':fmt(x.pozo||0)}</span></div>
     <span class="note">Jugaron: ${(x.jugadores||[]).map(esc).join(', ')}</span>
-    <span class="note">🏆 Ganó ${esc(x.ganador||'?')} · premio ${fmt(x.premio||0)}</span></div>`}).join(''):'<p class="note">No hay partidas registradas ese día.</p>';
+    <span class="note">🏆 Ganó ${esc(x.ganador||'?')}${x.prueba?'':' · premio '+fmt(x.premio||0)}</span></div>`}).join(''):'<p class="note">No hay partidas registradas ese día.</p>';
 }
 document.addEventListener('change',e=>{if(e.target.id==='dia'&&e.target.value){diaSel=e.target.value;subPartidas()}});
 function lista(){
@@ -328,7 +380,7 @@ document.addEventListener('submit',async e=>{
 document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a;
   if(a==='salir')return signOut(auth);
-  if(['png','share','vaciar','viejas','prueba','limpiar','progcancel'].includes(a))return accion(a,b);
+  if(['png','share','pngdia','sharedia','vaciar','viejas','prueba','limpiar','progcancel'].includes(a))return accion(a,b);
   if(a==='blq'||a==='del'){
     const u=us.find(x=>x.id===b.dataset.u);if(!u||u.admin)return;
     if(a==='blq'){

@@ -222,10 +222,10 @@ async function registrarLog(id){
     const ref=doc(db,'mesas',id);
     await runTransaction(db,async t=>{
       const d=(await t.get(ref)).data(),g=d&&d.g;
-      if(!g||d.prueba||!g.ganador||g.log)return;
+      if(!g||!g.ganador||g.log)return;
       g.log=true;
       const pozo=d.pozo||0;
-      t.set(doc(db,'partidas',id),{fecha:serverTimestamp(),mesa:d.nombre||'Mesa',max:d.max||0,limite:d.limite||0,entrada:d.entrada||0,pozo,comision:cfg.comision,premio:neto(pozo),ganador:g.nombres[g.ganador]||'?',ganadorUid:g.ganador,jugadores:g.orden.map(u=>g.nombres[u]||'?')});
+      t.set(doc(db,'partidas',id),{fecha:serverTimestamp(),mesa:d.nombre||'Mesa',prueba:!!d.prueba,max:d.max||0,limite:d.limite||0,entrada:d.entrada||0,pozo,comision:cfg.comision,premio:neto(pozo),ganador:g.nombres[g.ganador]||'?',ganadorUid:g.ganador,jugadores:g.orden.map(u=>g.nombres[u]||'?')});
       t.update(ref,{g});
     });
   }catch(e){}
@@ -399,7 +399,7 @@ onAuthStateChanged(auth,u=>{
     unsubs.push(onSnapshot(query(collection(db,'ranking'),orderBy('ganadas','desc'),limit(100)),s=>{rk=s.docs.map(d=>({id:d.id,...d.data()}));if(!mia)view()},()=>{}));
     unsubs.push(onSnapshot(query(collection(db,'mesas'),where('estado','in',['esperando','jugando'])),s=>{
       mesas=s.docs.map(d=>({id:d.id,...d.data({serverTimestamps:'estimate'})})).filter(m=>m.uids.length||(m.estado==='esperando'&&(m.fija||m.entrada===0)));
-      mia=buscarMia();detectarSonidos();if(mia&&mia.estado==='jugando'&&mia.g&&mia.g.ganador&&!mia.prueba&&(!mia.g.reg||!mia.g.log)){registrarStats(mia.id);registrarLog(mia.id)};view();
+      mia=buscarMia();detectarSonidos();if(mia&&mia.estado==='jugando'&&mia.g&&mia.g.ganador&&(mia.prueba?!mia.g.log:(!mia.g.reg||!mia.g.log))){if(!mia.prueba)registrarStats(mia.id);registrarLog(mia.id)};view();
     }));
   }
   view();
