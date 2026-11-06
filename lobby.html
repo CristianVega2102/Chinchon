@@ -180,11 +180,12 @@ function best(h){const cs=h.map(dc),n=cs.length,ms=[];
   return{pts:bp,melds:bs}}
 const isChin=h=>h.length===7&&h.every(n=>n<48)&&h.every(n=>((n/12)|0)===((h[0]/12)|0))&&Math.max(...h)-Math.min(...h)===6;
 const CORTE=3;
+const puedeCortar=g=>g.orden.every(u=>g.fuera[u]||(g.jug&&g.jug[u]));
 const canClose=(h,c)=>{const r=h.filter(x=>x!==c);return isChin(r)||best(r).pts<=CORTE};
 const sig=(g,i)=>{do{i=(i+1)%g.orden.length}while(g.fuera[g.orden[i]]);return i};
 function repartir(g){const m=shuf([...Array(50).keys()]);g.manos={};
   g.orden.forEach(u=>{g.manos[u]=g.fuera[u]?[]:ord(m.splice(0,7))});
-  g.desc=[m.pop()];g.mazo=m;g.dealer=sig(g,g.dealer);g.turno=sig(g,g.dealer);g.fase='robar';g.nuevo=-1;g.res=null;g.listosR={};g.venceReeng=0;g.vence=Date.now()+(g.seg||20)*1000}
+  g.desc=[m.pop()];g.mazo=m;g.dealer=sig(g,g.dealer);g.turno=sig(g,g.dealer);g.fase='robar';g.nuevo=-1;g.res=null;g.jug={};g.listosR={};g.venceReeng=0;g.vence=Date.now()+(g.seg||20)*1000}
 function cerrarMano(g,uid,chin){
   const filas=g.orden.filter(u=>g.manos[u].length).map(u=>{const h=g.manos[u],d=best(h).pts;
     const add=chin?0:u===uid?(d===0?-10:d):d;g.puntos[u]+=add;return{uid:u,add,mano:h,total:g.puntos[u]}});
@@ -227,7 +228,7 @@ function autoJugar(g){
   if(g.fase==='robar'){if(!g.mazo.length){const t=g.desc.pop();g.mazo=shuf(g.desc);g.desc=[t]}h=ord([...h,g.mazo.pop()])}
   let bi=0,bp=1e9,bc=-1;
   h.forEach((c,i)=>{const p=best(h.filter((_,k)=>k!==i)).pts;if(p<bp||(p===bp&&pt(c)>bc)){bp=p;bi=i;bc=pt(c)}});
-  g.desc.push(h[bi]);g.manos[u]=h.filter((_,k)=>k!==bi);g.turno=sig(g,g.turno);g.fase='robar';g.nuevo=-1;g.vence=Date.now()+(g.seg||20)*1000;
+  g.desc.push(h[bi]);g.manos[u]=h.filter((_,k)=>k!==bi);g.jug=g.jug||{};g.jug[u]=true;g.turno=sig(g,g.turno);g.fase='robar';g.nuevo=-1;g.vence=Date.now()+(g.seg||20)*1000;
 }
 
 /* ---------- Jugadas en línea ---------- */
@@ -369,7 +370,8 @@ function botJuega(g,u='bot'){
   h=ord([...h,c]);
   const r=mejorDesc(h),carta=h[r.i],resto=h.filter((_,k)=>k!==r.i);
   g.desc.push(carta);g.manos[u]=resto;
-  if(isChin(resto)||r.p<=CORTE){cerrarMano(g,u,isChin(resto));return}
+  if(puedeCortar(g)&&(isChin(resto)||r.p<=CORTE)){cerrarMano(g,u,isChin(resto));return}
+  g.jug=g.jug||{};g.jug[u]=true;
   g.turno=sig(g,g.turno);g.fase='robar';g.nuevo=-1;g.vence=Date.now()+(g.seg||20)*1000;
 }
 let botBusy=false;
@@ -422,8 +424,8 @@ async function juego(a,b){
       if(b.dataset.f==='mazo'&&!g.mazo.length){const top=g.desc.pop();g.mazo=shuf(g.desc);g.desc=[top]}
       const c=b.dataset.f==='mazo'?g.mazo.pop():g.desc.pop();g.manos[u]=ord([...g.manos[u],c]);g.nuevo=c;g.fase='tirar'});
     if(a==='tirar'&&sel!==null)await mover(g=>{if(g.orden[g.turno]!==u||g.fase!=='tirar'||!g.manos[u].includes(sel))return;
-      g.manos[u]=g.manos[u].filter(x=>x!==sel);g.desc.push(sel);g.turno=sig(g,g.turno);g.fase='robar';g.nuevo=-1;g.vence=Date.now()+(g.seg||20)*1000});
-    if(a==='cerrar'&&sel!==null)await mover(g=>{if(g.orden[g.turno]!==u||g.fase!=='tirar'||!canClose(g.manos[u],sel))return;
+      g.manos[u]=g.manos[u].filter(x=>x!==sel);g.desc.push(sel);g.jug=g.jug||{};g.jug[u]=true;g.turno=sig(g,g.turno);g.fase='robar';g.nuevo=-1;g.vence=Date.now()+(g.seg||20)*1000});
+    if(a==='cerrar'&&sel!==null)await mover(g=>{if(g.orden[g.turno]!==u||g.fase!=='tirar'||!puedeCortar(g)||!canClose(g.manos[u],sel))return;
       g.manos[u]=g.manos[u].filter(x=>x!==sel);g.desc.push(sel);cerrarMano(g,u,isChin(g.manos[u]))});
     if(a==='sig')await mover(g=>{if(g.fase!=='resumen'||g.ganador||g.fuera[u])return;g.listosR=g.listosR||{};g.listosR[u]=true;if(todosListos(g))repartir(g)});
     if(a==='reeng')await mover((g,d,t)=>{if(!g.fuera[u]||g.ganador||me.saldo<(d.reeng||d.entrada))return;
@@ -463,7 +465,8 @@ function juegoView(){
       if(s1<=r1&&s2<=r2)R=[A.concat(lo.slice(0,r1-s1)),B.concat(lo.slice(r1-s1))]}
     if(R)break}
   if(!R){const k=Math.ceil(L/2);R=[[...Array(L).keys()].slice(0,k),[...Array(L).keys()].slice(k)]}
-  const hand=`<div class="hand">${R[0].map(i=>hs[i]).join('')}</div><div class="hand" style="padding-top:8px">${R[1].map(i=>hs[i]).join('')}</div>`;
+  if(R[0].length>4||R[1].length>4){const f=R[0].concat(R[1]);R=[];for(let i=0;i<f.length;i+=4)R.push(f.slice(i,i+4))}
+  const hand=R.map((r,k)=>`<div class="hand"${k?' style="padding-top:8px"':''}>${r.map(i=>hs[i]).join('')}</div>`).join('');
   let res='';
   if(g.fase==='resumen'){
     const R=g.res,gan=g.ganador;
@@ -482,7 +485,7 @@ function juegoView(){
     <div class="piles"><div class="gc back ${mi&&g.fase==='robar'?'go':''}" data-a="robar" data-f="mazo" role="button" tabindex="0" aria-label="Sacar del mazo"></div>${gcard(top,mi&&g.fase==='robar'?'go':'',`data-a="robar" data-f="desc" role="button" tabindex="0" aria-label="Levantar del descarte"`)}</div>
     <div class="note" style="text-align:center">Mazo ${g.mazo.length} · Se elimina a los ${g.limite} puntos</div></div>
   ${res}${hand}
-  <div class="acts"><button class="b2" data-a="tirar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy?'':'disabled'}>Descartar</button><button class="b1" data-a="cerrar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy&&canClose(yo,sel)?'':'disabled'}>Cerrar mano</button></div>
+  <div class="acts"><button class="b2" data-a="tirar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy?'':'disabled'}>Descartar</button><button class="b1" data-a="cerrar" ${mi&&g.fase==='tirar'&&sel!==null&&!busy&&puedeCortar(g)&&canClose(yo,sel)?'':'disabled'}>Cerrar mano</button></div>${mi&&g.fase==='tirar'&&!puedeCortar(g)?'<p class="note" style="text-align:center">Todavía no se puede cerrar: todos deben jugar su primera carta.</p>':''}
   ${g.ganador||fuera?'':'<button class="b3" data-a="aband">Abandonar partida</button>'}${fuera&&!g.ganador?'<button class="b1" data-a="volver">Volver al lobby</button>':''}`;
 }
 let sel=null;const pref={ent:'',max:'4',lim:'100',sit:'si'};let cfg={comision:10,entradas:[500,1000,2000],turno:20,espera:40,reenganche:0,segReeng:20,whatsapp:''};
