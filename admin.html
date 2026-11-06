@@ -107,7 +107,7 @@ function fijasHTML(){
 let pm={t:'',bad:false};
 function progCard(){
   const m=fx.find(x=>x.id==='mesa-prog'),en=m?m.entrada:(cfg.entradas[0]||0),li=m?m.limite:100,mx=m?m.max:4;
-  return `<form class="card" id="pf"><h2>Partida programada</h2><p class="note">Los jugadores se suscriben pagando la entrada y no pueden cancelar: solo vos podés cancelar la partida (se devuelven las entradas). Arranca a la hora indicada si hay 2 o más suscriptos; si hay menos, arranca apenas se suscriba el segundo.</p>
+  return `<form class="card" id="pf"><h2>Partida programada</h2><p class="note">Los jugadores se suscriben pagando la entrada y pueden cancelar su suscripción antes de que arranque (se les devuelve la entrada). Vos también podés cancelar la partida (se devuelven las entradas a todos). Arranca a la hora indicada si hay 2 o más suscriptos; si hay menos, arranca apenas se suscriba el segundo.</p>
   <div id="pgs"></div>
   <label>Fecha y hora de inicio<input name="ini" type="datetime-local" required></label>
   <div class="row"><label style="flex:1">Entrada (0 = gratis)<input name="ep" type="number" min="0" max="100000" step="1" value="${en}"></label>
