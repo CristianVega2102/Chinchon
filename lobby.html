@@ -454,8 +454,16 @@ function juegoView(){
   const msg=g.fase==='resumen'?'Fin de la mano':fuera?'Estás eliminado. Podés mirar la partida.':mi?(g.fase==='robar'?'Tu turno: sacá del mazo o del descarte':'Elegí una carta para descartar o cerrar'):'Juega '+nom(g.orden[g.turno])+'…';
   const top=g.desc[g.desc.length-1],OR=ordenar(yo),mk=OR.col;
   const hs=fuera?[]:OR.cartas.map(n=>gcard(n,(sel===n?'sel ':'')+(g.nuevo===n?'nw ':'')+(mk[n]?'mk':''),`data-a="sel" data-c="${n}" role="button" tabindex="0"`).replace('style="background-image:',mk[n]?`style="--mc:${mk[n]};background-image:`:'style="background-image:'));
-  const cs=OR.cartas,L=hs.length,kk0=Math.ceil(L/2),okS=i=>!(mk[cs[i-1]]&&mk[cs[i-1]]===mk[cs[i]]);let kk=kk0;for(let d=0;d<L;d++){if(kk0+d<L&&okS(kk0+d)){kk=kk0+d;break}if(kk0-d>0&&okS(kk0-d)){kk=kk0-d;break}}
-  const hand=`<div class="hand">${hs.slice(0,kk).join('')}</div><div class="hand" style="padding-top:8px">${hs.slice(kk).join('')}</div>`;
+  const cs=OR.cartas,L=hs.length,gr=[],lo=[];
+  for(let i=0;i<L;i++){const c=mk[cs[i]];if(!c){lo.push(i);continue}const u=gr[gr.length-1];if(u&&u.c===c&&u.x[u.x.length-1]===i-1)u.x.push(i);else gr.push({c,x:[i]})}
+  let R=null;
+  for(const r1 of (L===7?[4,3]:[Math.ceil(L/2)])){const r2=L-r1;
+    for(let m=0;m<(1<<gr.length)&&!R;m++){let s1=0,s2=0,A=[],B=[];
+      gr.forEach((u,k)=>{if(m>>k&1){s1+=u.x.length;A.push(...u.x)}else{s2+=u.x.length;B.push(...u.x)}});
+      if(s1<=r1&&s2<=r2)R=[A.concat(lo.slice(0,r1-s1)),B.concat(lo.slice(r1-s1))]}
+    if(R)break}
+  if(!R){const k=Math.ceil(L/2);R=[[...Array(L).keys()].slice(0,k),[...Array(L).keys()].slice(k)]}
+  const hand=`<div class="hand">${R[0].map(i=>hs[i]).join('')}</div><div class="hand" style="padding-top:8px">${R[1].map(i=>hs[i]).join('')}</div>`;
   let res='';
   if(g.fase==='resumen'){
     const R=g.res,gan=g.ganador;
