@@ -30,17 +30,19 @@ h1{font-size:17px;font-weight:800;line-height:1.2}
 .piles{display:flex;gap:22px}
 .pile{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:var(--mute)}
 .card{position:relative;aspect-ratio:5/7;border-radius:8px;background:#f4ecd8;color:#222;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;border:2px solid #d9cba6;transition:transform .15s;user-select:none}
-.card .r{font-size:clamp(15px,4.8vw,21px);line-height:1}.card .s{font-size:clamp(13px,4vw,18px)}
+.card .r{font-size:clamp(20px,6vw,28px);line-height:1}.card .s{font-size:clamp(17px,5vw,24px)}
 .card.s0 .r{color:#9a6b00}.card.s1 .r{color:#b3261e}.card.s2 .r{color:#1f4e8c}.card.s3 .r{color:#2e6b34}
 .card.jk{background:#3b2a5c;color:#f2c14e;border-color:#5a4690}.card.jk .r{color:#f2c14e;font-size:11px}
 .card.back{background:repeating-linear-gradient(45deg,#1d3a2c,#1d3a2c 6px,#24493a 6px,#24493a 12px);border-color:#2f5c48}
-.pile .card{width:64px}
+.pile .card{width:84px}
 .pile .card.go{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold)}
-.hand{display:flex;gap:4px;justify-content:center;padding-top:14px}
-.hand .card{flex:1;max-width:58px;min-width:0;cursor:pointer}
-.hand .card.sel{transform:translateY(-12px);border-color:var(--gold);box-shadow:0 0 0 2px var(--gold)}
-.hand .card.new::before{content:'';position:absolute;top:3px;right:3px;width:7px;height:7px;border-radius:50%;background:var(--gold)}
-.hand .card i{position:absolute;left:3px;right:3px;bottom:3px;height:4px;border-radius:2px}
+.hand{display:flex;flex-wrap:wrap;gap:14px 6px;justify-content:center;padding-top:14px}
+.hand .card{flex:0 0 calc((100% - 18px)/4);max-width:76px;min-width:0;cursor:pointer}
+.hand .card.mk{border-color:var(--mc);box-shadow:0 0 0 2px var(--mc)}
+.hand .card.sel{transform:translateY(-12px);outline:3px solid #fff;outline-offset:1px}
+.hand .card.new{border-color:#ff4fd8;box-shadow:0 0 0 3px #ff4fd8}
+.hand .card.new::before{content:'';position:absolute;top:4px;right:4px;width:9px;height:9px;border-radius:50%;background:#ff4fd8}
+.hand .card i{position:absolute;left:4px;right:4px;bottom:4px;height:5px;border-radius:2px}
 .me{display:flex;justify-content:space-between;font-size:13px;color:var(--mute)}
 .me b{font-family:var(--mono);color:var(--ink)}
 .acts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -265,7 +267,7 @@ function render(){
   $('#msg').textContent=G.over?'Partida terminada':me.out&&G.turn===0?'':myTurn?(G.phase==='draw'?'Tu turno: sacá del mazo o del descarte':'Elegí una carta para descartar o cerrar'):'Juega '+G.players[G.turn].name+'…';
   const b=best(me.hand),mark={};
   b.melds.forEach((m,k)=>{for(let i=0;i<me.hand.length;i++)if(m>>i&1)mark[i]=COLORS[k%4]});
-  $('#hand').innerHTML=me.out?'<p class="note">Estás eliminado. Podés reengancharte al terminar la mano.</p>':me.hand.map((c,i)=>cardEl(c,(G.sel===i?'sel ':'')+(c===G.newCard?'new ':'')).replace(/^<div class="card/,`<div data-i="${i}" tabindex="0" role="button" class="card`).replace(/<\/div>$/,(mark[i]?`<i style="background:${mark[i]}"></i>`:'')+'</div>')).join('');
+  $('#hand').innerHTML=me.out?'<p class="note">Estás eliminado. Podés reengancharte al terminar la mano.</p>':me.hand.map((c,i)=>cardEl(c,(G.sel===i?'sel ':'')+(c===G.newCard?'new ':'')+(mark[i]?'mk ':'')).replace(/^<div class="card/,`<div data-i="${i}" ${mark[i]?`style="--mc:${mark[i]}"`:''} tabindex="0" role="button" class="card`).replace(/<\/div>$/,(mark[i]?`<i style="background:${mark[i]}"></i>`:'')+'</div>')).join('');
   const sel=G.sel!==null&&myTurn&&G.phase==='discard';
   $('#bdis').disabled=!sel;
   $('#bclose').disabled=!(sel&&canClose(me.hand,G.sel));
