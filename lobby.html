@@ -47,7 +47,8 @@ a.b1{text-decoration:none;text-align:center;display:block;border-radius:14px;pad
 .mcs{display:flex;flex-wrap:wrap;gap:3px}.mc{font-family:var(--mono);font-size:12px;background:#f4ecd8;color:#222;border-radius:4px;padding:2px 4px;font-weight:700}.mc.j{background:#3b2a5c;color:var(--gold)}
 .acts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .hand .gc{max-width:108px;font-size:clamp(20px,6.2vw,30px)}.gc.sel{transform:translateY(-6px)}
-.hand{gap:6px;margin:0 -6px}
+.hand{gap:5px;margin:0 -10px}
+.hand .gc{flex:0 1 calc((100% - 15px)/4)}
 .hand .gc.mk{border-color:var(--mc);box-shadow:0 0 0 2px var(--mc)}
 .hand .gc.nw{border-color:#ff4fd8;box-shadow:0 0 0 3px #ff4fd8}
 .hand .gc.sel{outline:3px solid #fff;outline-offset:2px}
@@ -453,7 +454,8 @@ function juegoView(){
   const msg=g.fase==='resumen'?'Fin de la mano':fuera?'Estás eliminado. Podés mirar la partida.':mi?(g.fase==='robar'?'Tu turno: sacá del mazo o del descarte':'Elegí una carta para descartar o cerrar'):'Juega '+nom(g.orden[g.turno])+'…';
   const top=g.desc[g.desc.length-1],OR=ordenar(yo),mk=OR.col;
   const hs=fuera?[]:OR.cartas.map(n=>gcard(n,(sel===n?'sel ':'')+(g.nuevo===n?'nw ':'')+(mk[n]?'mk':''),`data-a="sel" data-c="${n}" role="button" tabindex="0"`).replace('style="background-image:',mk[n]?`style="--mc:${mk[n]};background-image:`:'style="background-image:'));
-  const kk=Math.floor(hs.length/2),hand=`<div class="hand">${hs.slice(0,kk).join('')}</div><div class="hand" style="padding-top:8px">${hs.slice(kk).join('')}</div>`;
+  const cs=OR.cartas,L=hs.length,kk0=Math.ceil(L/2),okS=i=>!(mk[cs[i-1]]&&mk[cs[i-1]]===mk[cs[i]]);let kk=kk0;for(let d=0;d<L;d++){if(kk0+d<L&&okS(kk0+d)){kk=kk0+d;break}if(kk0-d>0&&okS(kk0-d)){kk=kk0-d;break}}
+  const hand=`<div class="hand">${hs.slice(0,kk).join('')}</div><div class="hand" style="padding-top:8px">${hs.slice(kk).join('')}</div>`;
   let res='';
   if(g.fase==='resumen'){
     const R=g.res,gan=g.ganador;
