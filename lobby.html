@@ -201,6 +201,7 @@ async function registrarStats(id){
   }catch(e){}
 }
 const CUENTA=20;
+const REV_VENTANA=90,REV_ESPERA=60,AUTO_MIN=15;
 const cuenta=m=>{const t=m.cuentaIni&&m.cuentaIni.toMillis?m.cuentaIni.toMillis():0;if(!t)return 999;const seg=CUENTA;return Math.ceil((t+seg*1000-Date.now())/1000)};
 setInterval(()=>{
   if(!U||!mia||mia.estado!=='esperando'||mia.uids.length<2)return;
@@ -209,7 +210,7 @@ setInterval(()=>{
   if(r<=0)autoIniciar();
 },1000);
 let dej=new Set();try{dej=new Set(JSON.parse(localStorage.getItem('dej')||'[]'))}catch(e){}
-const buscarMia=()=>{const l=mesas.filter(m=>m.uids.includes(U.uid)&&!dej.has(m.id)&&!(m.prog&&m.estado==='esperando'));return l.find(m=>m.estado==='jugando')||l[0]||null};
+const buscarMia=()=>{const l=mesas.filter(m=>m.uids.includes(U.uid)&&!dej.has(m.id)&&!(m.prog&&m.estado==='esperando'));const pend=m=>m.g&&m.g.ganador===U.uid&&!m.g.pagado,run=m=>m.estado==='jugando'&&!(m.g&&m.g.ganador);return l.find(pend)||l.find(run)||l.find(m=>m.estado==='jugando')||l[0]||null};
 const progMesa=()=>mesas.find(m=>m.id==='mesa-prog'&&m.estado==='esperando')||null;
 const bloqueaPrincipal=()=>{const p=progMesa();return !!(p&&p.inicio&&p.uids.includes(U.uid)&&p.inicio.toMillis()<=Date.now()+15*60000)};
 const dur=s=>{const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),x=s%60,p=n=>String(n).padStart(2,'0');return (d?d+'d ':'')+p(h)+':'+p(m)+':'+p(x)};
@@ -229,6 +230,70 @@ async function registrarLog(id){
       t.update(ref,{g});
     });
   }catch(e){}
+}
+/* ---------- Partida programada siempre activa: revancha y reprogramación automática ---------- */
+const tms=x=>x&&x.toMillis?x.toMillis():0;
+const mfT={};
+async function marcarFinProg(m){
+  if(!m||m.origen!=='mesa-prog')return;
+  if(Date.now()-(mfT[m.id]||0)<20000)return;mfT[m.id]=Date.now();
+  try{
+    const ref=doc(db,'mesas','mesa-prog');
+    await runTransaction(db,async t=>{
+      const d=(await t.get(ref)).data();
+      if(!d||d.ultima!==m.id||d.revanchaDe===m.id||d.inicio||(d.uids||[]).length)return;
+      if(tms(d.cierraHasta)>Date.now())return;
+      t.update(ref,{revanchaDe:m.id,reprogDesde:new Date(Date.now()+REV_VENTANA*1000)});
+    });
+  }catch(e){}
+}
+let progAuto=false;
+setInterval(async()=>{
+  if(!U||!me||progAuto)return;
+  const p=progMesa();if(!p||p.inicio||p.uids.length)return;
+  const now=Date.now(),cierre=tms(p.cierraHasta),desde=tms(p.reprogDesde);
+  if(cierre){if(now<cierre)return}else if(!desde||now<desde)return;
+  progAuto=true;
+  try{await updateDoc(doc(db,'mesas','mesa-prog'),{inicio:new Date(now+AUTO_MIN*60000),reprogDesde:null,cierraHasta:null})}catch(e){}
+  setTimeout(()=>{progAuto=false},5000);
+},2000);
+setInterval(()=>{
+  const el=document.getElementById('cdrev');if(!el)return;
+  const p=progMesa();if(!p)return;
+  const f=tms(p.inicio)||tms(p.reprogDesde);
+  el.textContent=Math.max(0,Math.ceil((f-Date.now())/1000))+'s';
+},1000);
+async function revancha(){
+  const m=mia,mp=progMesa();
+  if(!m||!mp||busy)return;
+  if(me.saldo<mp.entrada){err='No tenés saldo suficiente para la revancha.';return view()}
+  if(mp.entrada>0&&!confirm('Se te descuenta la entrada ('+ent(mp.entrada)+') y NO podés cancelar la suscripción. ¿Confirmás la revancha?'))return;
+  err='';busy=true;view();
+  try{
+    if(!mp.inicio){
+      /* el primero en pedir revancha fija el arranque; si otro ya lo hizo, este paso falla y se sigue igual */
+      try{await updateDoc(doc(db,'mesas','mesa-prog'),{inicio:new Date(Date.now()+REV_ESPERA*1000),reprogDesde:null,cierraHasta:null})}catch(e){}
+    }
+    const b=writeBatch(db);
+    b.update(doc(db,'mesas','mesa-prog'),{uids:arrayUnion(U.uid),jugadores:arrayUnion({uid:U.uid,name:me.name}),pozo:increment(mp.entrada),listos:[],cuentaIni:serverTimestamp()});
+    if(mp.entrada>0)b.update(doc(db,'users',U.uid),{saldo:increment(-mp.entrada)});
+    await b.commit();
+    const g=m.g;
+    if(g&&g.ganador===U.uid&&g.pagado){try{await updateDoc(doc(db,'mesas',m.id),{estado:'terminada'})}catch(e){}}
+    busy=false;dejar(m.id);
+  }catch(x){fail(x)}
+}
+function revanchaHTML(m,g,u){
+  if(m.origen!=='mesa-prog')return '';
+  const mp=progMesa();if(!mp)return '';
+  const now=Date.now(),ini=tms(mp.inicio),desde=tms(mp.reprogDesde);
+  if(tms(mp.cierraHasta)>now)return '<p class="note">🔒 La partida programada está cerrada por hoy.</p>';
+  const enRev=mp.revanchaDe===m.id&&((!ini&&desde&&now<desde)||(ini&&ini-now<=(REV_ESPERA+5)*1000));
+  if(!enRev)return ini?`<p class="note">📅 Próxima partida programada: <b>${esc(new Date(ini).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}))}</b>. La encontrás en el lobby.</p>`:'<p class="note">📅 La próxima partida programada se arma sola en unos minutos. La vas a ver en el lobby.</p>';
+  if(g.ganador===u&&!g.pagado)return '<p class="note">Cobrá tu premio para poder pedir la revancha.</p>';
+  const falta=me.saldo<mp.entrada,llena=mp.uids.length>=mp.max;
+  return `<div class="card" style="padding:10px"><b>🔁 Revancha</b><p class="note">${mp.uids.length?mp.uids.length+' confirmado'+(mp.uids.length===1?'':'s')+' · ':''}${ini?'Empieza en':'Tenés'} <b id="cdrev" class="mono gold">${Math.max(0,Math.ceil(((ini||desde)-now)/1000))}s</b>${ini?'':' para pedirla'}. Entrada ${ent(mp.entrada)}. Si nadie la pide, la próxima partida se programa sola en ${AUTO_MIN} minutos.</p>
+    <button class="b1" data-a="revancha" ${busy||falta||llena?'disabled':''}>${falta?'Saldo insuficiente':llena?'Cupo completo':'Pedir revancha'}</button></div>`;
 }
 let iniP=false;
 async function iniciarProg(){
@@ -371,7 +436,7 @@ function juegoView(){
     const filas=R.filas.map(f=>`<div class="card" style="padding:10px"><div class="row"><b>${nom(f.uid)}${g.fuera[f.uid]?' · eliminado':''}</b><span class="mono" style="color:${f.add>0?'var(--bad)':'var(--ok)'}">${f.add>0?'+':''}${f.add} → ${f.total}</span></div>${(()=>{const d=desglose(f.mano);return `<div class="mcs">${d.grupos.map(gr=>`<span class="grp">${gr.map(mini).join('')}</span>`).join('')}</div>`+(d.sueltas.length?`<div class="mcs"><span class="note">Suman ${d.pts}:</span>${d.sueltas.map(mini).join('')}</div>`:'<div class="note">Todas combinadas</div>')})()}</div>`).join('');
     let bt='';
     if(gan){const prize=neto(m.pozo);
-      bt=`<h2>${R.chin?'¡CHINCHÓN! ':''}Ganó ${nom(gan)}</h2>`+(R.motivo?`<p class="note">${(R.quien||[]).map(nom).join(', ')} ${R.motivo==='tiempo'?'no tocó Listo a tiempo':'abandonó la partida'}.</p>`:'')+(g.pagado?`<button class="b1" data-a="fin">Volver al lobby</button>`:gan===u?`<button class="b1" data-a="cobrar" ${busy?'disabled':''}>Cobrar ${fmt(prize)}</button>`:`<button class="b1" data-a="volver">Volver al lobby</button>`);
+      bt=`<h2>${R.chin?'¡CHINCHÓN! ':''}Ganó ${nom(gan)}</h2>`+(R.motivo?`<p class="note">${(R.quien||[]).map(nom).join(', ')} ${R.motivo==='tiempo'?'no tocó Listo a tiempo':'abandonó la partida'}.</p>`:'')+(g.pagado?`<button class="b1" data-a="fin">Volver al lobby</button>`:gan===u?`<button class="b1" data-a="cobrar" ${busy?'disabled':''}>Cobrar ${fmt(prize)}</button>`:`<button class="b1" data-a="volver">Volver al lobby</button>`)+revanchaHTML(m,g,u);
     }else{const vr=g.venceReeng?Math.max(0,Math.ceil((g.venceReeng-Date.now())/1000)):0;
       const ven=vr>0?`<p class="note">${fuera?'Tenés':'Esperando un posible reenganche:'} <b id="cdre" class="mono gold">${vr}s</b>${fuera?' para reengancharte.':''}</p>`:'';
       bt=`<h2>${nom(R.cerro)} cerró la mano</h2>`+ven+(fuera?`<button class="b2" data-a="reeng" ${busy||me.saldo<(m.reeng||m.entrada)?'disabled':''}>Reengancharse ${(m.reeng||m.entrada)?'por '+fmt(m.reeng||m.entrada):'gratis'}</button>`:'')+(fuera?'':`<p class="note">Tenés <b id="cdr" class="mono gold">${Math.max(0,Math.ceil((g.venceR-Date.now())/1000))}s</b> para tocar Listo, o perdés la partida.</p>`)+`<button class="b1" data-a="sig" ${busy||fuera||(g.listosR||{})[u]?'disabled':''}>${(g.listosR||{})[u]?'Esperando a los demás':'Listo para la siguiente mano'} (${Object.keys(g.listosR||{}).length}/${g.orden.filter(x=>!g.fuera[x]).length})</button>`;}
@@ -399,7 +464,7 @@ onAuthStateChanged(auth,u=>{
     unsubs.push(onSnapshot(query(collection(db,'ranking'),orderBy('ganadas','desc'),limit(100)),s=>{rk=s.docs.map(d=>({id:d.id,...d.data()}));if(!mia)view()},()=>{}));
     unsubs.push(onSnapshot(query(collection(db,'mesas'),where('estado','in',['esperando','jugando'])),s=>{
       mesas=s.docs.map(d=>({id:d.id,...d.data({serverTimestamps:'estimate'})})).filter(m=>m.uids.length||(m.estado==='esperando'&&(m.fija||m.entrada===0)));
-      mia=buscarMia();detectarSonidos();if(mia&&mia.estado==='jugando'&&mia.g&&mia.g.ganador&&(mia.prueba?!mia.g.log:(!mia.g.reg||!mia.g.log))){if(!mia.prueba)registrarStats(mia.id);registrarLog(mia.id)};view();
+      mia=buscarMia();detectarSonidos();if(mia&&mia.estado==='jugando'&&mia.g&&mia.g.ganador&&(mia.prueba?!mia.g.log:(!mia.g.reg||!mia.g.log))){if(!mia.prueba)registrarStats(mia.id);registrarLog(mia.id)};if(mia&&mia.origen==='mesa-prog'&&mia.estado==='jugando'&&mia.g&&mia.g.ganador)marcarFinProg(mia);view();
     }));
   }
   view();
@@ -469,7 +534,7 @@ function principalHTML(m){
 }
 function progHTML(){
   const p=progMesa();
-  if(!p||!p.inicio)return `<div class="card"><h2>📅 Partida programada</h2><p class="note">Por ahora no hay ninguna partida programada. Cuando el administrador programe una, te vas a poder suscribir desde acá.</p></div>`;
+  if(!p||!p.inicio){const cz=p&&tms(p.cierraHasta)>Date.now();return `<div class="card"><h2>📅 Partida programada</h2><p class="note">${cz?'🔒 Cerrada por hoy. Se vuelve a abrir mañana.':(p&&(p.reprogDesde||p.ultima))?'La próxima partida se programa sola poco después de que termine la que está en juego.':'Por ahora no hay ninguna partida programada. Cuando el administrador programe una, te vas a poder suscribir desde acá.'}</p></div>`}
   const ya=p.uids.includes(U.uid),llena=p.uids.length>=p.max,falta=me.saldo<p.entrada,cerr=p.inicio.toMillis()<=Date.now()&&p.uids.length>=2;
   const cuando=p.inicio.toDate().toLocaleString('es-AR',{weekday:'long',day:'2-digit',month:'long',hour:'2-digit',minute:'2-digit'});
   const lbl=ya?'Estás suscripto ✔':cerr?'Inscripción cerrada':llena?'Cupo completo':falta?'Saldo insuficiente':'Suscribirme';
@@ -521,6 +586,7 @@ document.addEventListener('click',async e=>{
   if(a==='modo'){modo=b.dataset.v;err='';return view()}
   if(a==='vista'){vista=b.dataset.v;err='';return view()}
   if(a==='salir')return signOut(auth);
+  if(a==='revancha')return revancha();
   if(a==='snd'){sonido=!sonido;try{localStorage.setItem('snd',sonido?'1':'0')}catch(e){}if(sonido)sonar('inicio');return view()}
   if(['robar','tirar','cerrar','sig','reeng','cobrar','ready','sel','fin','aband','volver'].includes(a))return juego(a,b);
   if(a==='unirse'){

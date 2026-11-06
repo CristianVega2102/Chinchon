@@ -107,7 +107,7 @@ function fijasHTML(){
 let pm={t:'',bad:false};
 function progCard(){
   const m=fx.find(x=>x.id==='mesa-prog'),en=m?m.entrada:(cfg.entradas[0]||0),li=m?m.limite:100,mx=m?m.max:4;
-  return `<form class="card" id="pf"><h2>Partida programada</h2><p class="note">Los jugadores se suscriben pagando la entrada y no pueden cancelar: solo vos podés cancelar la partida (se devuelven las entradas). Arranca a la hora indicada si hay 2 o más suscriptos; si hay menos, arranca apenas se suscriba el segundo.</p>
+  return `<form class="card" id="pf"><h2>Partida programada</h2><p class="note">Esta mesa está siempre activa: cuando termina una partida los jugadores pueden pedir revancha y, si nadie la pide, se programa sola 15 minutos después. Los jugadores se suscriben pagando la entrada y no pueden cancelar: solo vos podés cerrar la mesa por hoy (se devuelven las entradas). Este formulario sirve para crearla la primera vez o para cambiar la hora, la entrada o los puntos.</p>
   <div id="pgs"></div>
   <label>Fecha y hora de inicio<input name="ini" type="datetime-local" required></label>
   <div class="row"><label style="flex:1">Entrada (0 = gratis)<input name="ep" type="number" min="0" max="100000" step="1" value="${en}"></label>
@@ -119,12 +119,17 @@ function progCard(){
 function progv(){
   const el=document.getElementById('pgs');if(!el)return;
   const m=fx.find(x=>x.id==='mesa-prog');
-  if(!m||!m.inicio||!m.inicio.toDate){el.innerHTML='<p class="note">No hay ninguna partida programada.</p>';return}
+  const tm=x=>x&&x.toMillis?x.toMillis():0;
+  const fh=ms=>new Date(ms).toLocaleString('es-AR',{weekday:'long',day:'2-digit',month:'long',hour:'2-digit',minute:'2-digit'});
+  if(m&&tm(m.cierraHasta)>Date.now()){
+    el.innerHTML=`<div class="u"><b>🔒 Cerrada por hoy</b><span class="note">Se reabre sola el ${esc(fh(tm(m.cierraHasta)))}.</span><button type="button" class="b1" data-a="progabrir">Reabrir ahora (se programa en 15 min)</button></div>`;return}
+  if(!m||!m.inicio||!m.inicio.toDate){
+    el.innerHTML=`<p class="note">${m?'Ahora no hay una hora programada: hay una partida en juego o se está esperando la revancha. Cuando termine, si nadie pide revancha, se programa sola 15 minutos después. Si pasó mucho tiempo y no se programó, usá el formulario de abajo.':'Todavía no creaste la partida programada. Usá el formulario de abajo.'}</p>${m?'<button type="button" class="b2" style="color:var(--bad)" data-a="progcerrar">Cerrar por hoy</button>':''}`;return}
   const cuando=m.inicio.toDate().toLocaleString('es-AR',{weekday:'long',day:'2-digit',month:'long',hour:'2-digit',minute:'2-digit'});
   el.innerHTML=`<div class="u"><div class="row"><b>Programada: ${esc(cuando)}</b><span class="mono gold">${m.uids.length}/${m.max}</span></div>
   <span class="note">Entrada ${fmt(m.entrada)} · pozo ${fmt(m.pozo||0)} · ${m.limite} puntos</span>
   <span class="note">Suscriptos: ${(m.jugadores||[]).map(j=>esc(j.name)).join(', ')||'nadie todavía'}</span>
-  <button type="button" class="b2" style="color:var(--bad)" data-a="progcancel">Cancelar partida programada${m.entrada>0&&m.uids.length?' y devolver entradas':''}</button></div>`;
+  <button type="button" class="b2" style="color:var(--bad)" data-a="progcerrar">Cerrar por hoy${m.entrada>0&&m.uids.length?' y devolver entradas':''}</button></div>`;
 }
 function estados(){
   progv();
@@ -231,7 +236,7 @@ function pruebaCard(){
 }
 async function guardarProg(f){
   const ex=fx.find(x=>x.id==='mesa-prog');
-  if(ex&&ex.uids.length){pm={t:'Hay jugadores suscriptos. Cancelá la partida programada antes de programar otra.',bad:true};return view()}
+  if(ex&&ex.uids.length){pm={t:'Hay jugadores suscriptos. Cerrá la mesa por hoy (se devuelven las entradas) antes de programar otra.',bad:true};return view()}
   const ini=new Date(f.get('ini')),entrada=Math.floor(+f.get('ep')),limite=Math.floor(+f.get('lp')),max=Math.floor(+f.get('mp'));
   if(isNaN(ini.getTime())||ini.getTime()<Date.now()+60000){pm={t:'Elegí una fecha y hora futura (al menos 1 minuto desde ahora).',bad:true};return view()}
   if(!(entrada>=0&&entrada<=100000)||!(limite>=20&&limite<=500)||!(max>=2&&max<=6)){pm={t:'Revisá la entrada (0 a 100000), los puntos (20 a 500) y los jugadores (2 a 6).',bad:true};return view()}
@@ -251,16 +256,23 @@ async function accion(a,b){
     catch(x){alert('No se pudo limpiar el ranking. ¿Publicaste las reglas nuevas?')}
     b.disabled=false;return;
   }
-  if(a==='progcancel'){
+  if(a==='progcerrar'){
     const m=fx.find(x=>x.id==='mesa-prog');if(!m)return;
-    if(!confirm('¿Cancelar la partida programada?'+(m.entrada>0&&m.uids.length?' Se devuelve la entrada ('+fmt(m.entrada)+') a cada suscripto.':'')))return;
+    if(!confirm('¿Cerrar la partida programada por hoy? No se programan más partidas hasta mañana a las 00:00.'+(m.entrada>0&&m.uids.length?' Se devuelve la entrada ('+fmt(m.entrada)+') a cada suscripto.':'')))return;
     b.disabled=true;
     try{
+      const man=new Date();man.setHours(24,0,0,0);
       const w=writeBatch(db);
-      w.update(doc(db,'mesas','mesa-prog'),{uids:[],jugadores:[],pozo:0,listos:[],cuentaIni:serverTimestamp(),inicio:null});
+      w.update(doc(db,'mesas','mesa-prog'),{uids:[],jugadores:[],pozo:0,listos:[],cuentaIni:serverTimestamp(),inicio:null,reprogDesde:null,cierraHasta:man});
       if(m.entrada>0)m.uids.forEach(u=>w.update(doc(db,'users',u),{saldo:increment(m.entrada)}));
       await w.commit();
-    }catch(x){alert('No se pudo cancelar.');b.disabled=false}
+    }catch(x){alert('No se pudo cerrar. ¿Publicaste las reglas nuevas de Firestore?');b.disabled=false}
+    return;
+  }
+  if(a==='progabrir'){
+    b.disabled=true;
+    try{await updateDoc(doc(db,'mesas','mesa-prog'),{cierraHasta:null,reprogDesde:null,inicio:new Date(Date.now()+15*60000)})}
+    catch(x){alert('No se pudo reabrir.');b.disabled=false}
     return;
   }
   if(a==='prueba'){b.disabled=true;try{await setDoc(doc(db,'config','general'),{prueba:!cfg.prueba},{merge:true})}catch(x){alert('No se pudo cambiar.')}b.disabled=false;return}
@@ -320,6 +332,17 @@ async function accion(a,b){
     }catch(x){alert('No se pudo borrar.');b.disabled=false}
   }
 }
+/* ---------- Mantener la partida programada siempre activa ---------- */
+let progAuto=false;
+setInterval(async()=>{
+  if(!U||!me||!me.admin||progAuto)return;
+  const p=fx.find(x=>x.id==='mesa-prog');if(!p||p.inicio||(p.uids||[]).length)return;
+  const t=x=>x&&x.toMillis?x.toMillis():0,now=Date.now(),cierre=t(p.cierraHasta),desde=t(p.reprogDesde);
+  if(cierre){if(now<cierre)return}else if(!desde||now<desde)return;
+  progAuto=true;
+  try{await updateDoc(doc(db,'mesas','mesa-prog'),{inicio:new Date(now+15*60000),reprogDesde:null,cierraHasta:null})}catch(e){}
+  setTimeout(()=>{progAuto=false},5000);
+},2000);
 /* ---------- Registro de partidas del día ---------- */
 let pd=[],unPart=null;
 const hoyStr=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
@@ -380,7 +403,7 @@ document.addEventListener('submit',async e=>{
 document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a;
   if(a==='salir')return signOut(auth);
-  if(['png','share','pngdia','sharedia','vaciar','viejas','prueba','limpiar','progcancel'].includes(a))return accion(a,b);
+  if(['png','share','pngdia','sharedia','vaciar','viejas','prueba','limpiar','progcerrar','progabrir'].includes(a))return accion(a,b);
   if(a==='blq'||a==='del'){
     const u=us.find(x=>x.id===b.dataset.u);if(!u||u.admin)return;
     if(a==='blq'){
