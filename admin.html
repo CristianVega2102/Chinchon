@@ -194,8 +194,7 @@ async function dibujar(){
   return new Promise(r=>c.toBlob(r,'image/png'));
 }
 async function dibujarDia(){
-  const MAXF=100,l=pd.slice(0,MAXF),extra=pd.length-l.length;
-  const re=pd.filter(x=>!x.prueba),np=pd.length-re.length;
+  const MAXF=100,re=pd.filter(x=>!x.prueba),l=re.slice(0,MAXF),extra=re.length-l.length;
   const pozo=re.reduce((s,x)=>s+(x.pozo||0),0),prem=re.reduce((s,x)=>s+(x.premio||0),0);
   try{await Promise.all([document.fonts.load('800 40px "Plus Jakarta Sans"'),document.fonts.load('700 30px "JetBrains Mono"')])}catch(e){}
   const SANS='"Plus Jakarta Sans",system-ui,sans-serif',MONO='"JetBrains Mono",ui-monospace,monospace';
@@ -211,7 +210,6 @@ async function dibujarDia(){
   x.fillStyle='#1a3025';rr(x,60,250,W-120,170,24);x.fill();
   const cols=[['PARTIDAS',String(re.length),'#e8f0ea'],['POZO',fmt(pozo),'#e8f0ea'],['PREMIOS',fmt(prem),'#5fd08a'],['COMISIÓN',fmt(pozo-prem),'#f2c14e']];
   cols.forEach((k,i)=>{const cx=60+(W-120)/8+i*(W-120)/4;x.fillStyle='#8fa597';x.font='700 24px '+SANS;x.fillText(k[0],cx,300);x.fillStyle=k[2];x.font='700 34px '+MONO;x.fillText(k[1],cx,360)});
-  if(np){x.fillStyle='#8fa597';x.font='600 24px '+SANS;x.fillText('🤖 '+np+' partida'+(np===1?'':'s')+' de prueba (no suman en los totales)',W/2,445)}
   const cut=(t,w)=>{if(x.measureText(t).width<=w)return t;while(t.length>1&&x.measureText(t+'…').width>w)t=t.slice(0,-1);return t+'…'};
   if(!l.length){x.fillStyle='#8fa597';x.font='600 34px '+SANS;x.fillText('No hay partidas registradas ese día',W/2,TOP+RH/2)}
   l.forEach((p,i)=>{
