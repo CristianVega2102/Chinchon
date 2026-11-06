@@ -40,13 +40,17 @@ a.b1{text-decoration:none;text-align:center;display:block;border-radius:14px;pad
 .gc.back{border-color:#2f5c48}
 .gc.sel{transform:translateY(-12px);border-color:var(--gold);box-shadow:0 0 0 2px var(--gold)}
 .gc.go{box-shadow:0 0 0 2px var(--gold)}
-.gc.nw::before{content:'';position:absolute;top:3px;right:3px;width:7px;height:7px;border-radius:50%;background:var(--gold)}
+.gc.nw::before{content:'';position:absolute;top:4px;right:4px;width:9px;height:9px;border-radius:50%;background:#ff4fd8}
 .gc i{position:absolute;left:3px;right:3px;bottom:3px;height:4px;border-radius:2px}
 .hand{display:flex;gap:4px;justify-content:center;padding-top:14px}
-.piles{display:flex;gap:22px;justify-content:center}.piles .gc{width:92px;max-width:92px;flex:none}
+.piles{display:flex;gap:22px;justify-content:center}.piles .gc{width:108px;max-width:108px;flex:none}
 .mcs{display:flex;flex-wrap:wrap;gap:3px}.mc{font-family:var(--mono);font-size:12px;background:#f4ecd8;color:#222;border-radius:4px;padding:2px 4px;font-weight:700}.mc.j{background:#3b2a5c;color:var(--gold)}
 .acts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.hand .gc{max-width:94px;font-size:clamp(17px,5.4vw,26px)}.gc.sel{transform:translateY(-6px)}
+.hand .gc{max-width:108px;font-size:clamp(20px,6.2vw,30px)}.gc.sel{transform:translateY(-6px)}
+.hand{gap:6px;margin:0 -6px}
+.hand .gc.mk{border-color:var(--mc);box-shadow:0 0 0 2px var(--mc)}
+.hand .gc.nw{border-color:#ff4fd8;box-shadow:0 0 0 3px #ff4fd8}
+.hand .gc.sel{outline:3px solid #fff;outline-offset:2px}
 .grp{display:flex;gap:3px;padding:3px;border:1px solid var(--ok);border-radius:7px}
 .logo{display:block;margin:0 auto;width:150px;max-width:55%;height:auto}.logo.g{width:210px;max-width:70%}
 /* ---------- Lobby: mesa principal protagonista, programada con expectativa, prueba como puerta de entrada ---------- */
@@ -448,7 +452,7 @@ function juegoView(){
   const ops=[u,...g.orden.filter(x=>x!==u)].map(x=>`<div class="seat ${g.orden[g.turno]===x&&g.fase!=='resumen'?'me':''}" style="min-height:0;padding:10px 4px;${g.fuera[x]?'opacity:.45':''}"><div class="av" style="width:40px;height:40px;font-size:16px">${esc(g.nombres[x][0].toUpperCase())}</div><b style="font-size:13px">${x===u?'Vos':nom(x)}</b><span class="mono gold" style="font-size:22px;font-weight:800;line-height:1.1">${g.puntos[x]}<small style="font-size:13px;font-weight:600">/${g.limite}</small></span>${g.fuera[x]?'<span class="tag">Eliminado</span>':''}</div>`).join('');
   const msg=g.fase==='resumen'?'Fin de la mano':fuera?'Estás eliminado. Podés mirar la partida.':mi?(g.fase==='robar'?'Tu turno: sacá del mazo o del descarte':'Elegí una carta para descartar o cerrar'):'Juega '+nom(g.orden[g.turno])+'…';
   const top=g.desc[g.desc.length-1],OR=ordenar(yo),mk=OR.col;
-  const hs=fuera?[]:OR.cartas.map(n=>gcard(n,(sel===n?'sel ':'')+(g.nuevo===n?'nw':''),`data-a="sel" data-c="${n}" role="button" tabindex="0"`).replace(/<\/div>$/,mk[n]?`<i style="background:${mk[n]}"></i></div>`:'</div>'));
+  const hs=fuera?[]:OR.cartas.map(n=>gcard(n,(sel===n?'sel ':'')+(g.nuevo===n?'nw ':'')+(mk[n]?'mk':''),`data-a="sel" data-c="${n}" role="button" tabindex="0"`).replace('style="background-image:',mk[n]?`style="--mc:${mk[n]};background-image:`:'style="background-image:'));
   const kk=Math.floor(hs.length/2),hand=`<div class="hand">${hs.slice(0,kk).join('')}</div><div class="hand" style="padding-top:8px">${hs.slice(kk).join('')}</div>`;
   let res='';
   if(g.fase==='resumen'){
