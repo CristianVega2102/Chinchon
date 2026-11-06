@@ -49,6 +49,51 @@ a.b1{text-decoration:none;text-align:center;display:block;border-radius:14px;pad
 .hand .gc{max-width:94px;font-size:clamp(17px,5.4vw,26px)}.gc.sel{transform:translateY(-6px)}
 .grp{display:flex;gap:3px;padding:3px;border:1px solid var(--ok);border-radius:7px}
 .logo{display:block;margin:0 auto;width:150px;max-width:55%;height:auto}.logo.g{width:210px;max-width:70%}
+/* ---------- Lobby: mesa principal protagonista, programada con expectativa, prueba como puerta de entrada ---------- */
+.ttl{text-align:center;font-size:clamp(22px,6.4vw,28px);font-weight:800;font-style:italic;line-height:1.1;margin-top:2px}
+.pill{display:inline-flex;align-items:center;gap:8px;background:#12301f;border:1px solid #1f5a38;border-radius:999px;padding:6px 14px;font-size:13px;font-weight:700;color:var(--ink)}
+.dot{width:10px;height:10px;border-radius:50%;background:#3ddc7a;box-shadow:0 0 8px #3ddc7a;display:inline-block}
+.cta{width:100%;background:linear-gradient(180deg,#ffd75e,#f2b01e);color:#2a2100;font-size:18px;font-weight:800;letter-spacing:.3px;border-radius:999px;padding:15px;box-shadow:0 4px 14px rgba(242,193,78,.35)}
+.cta.gr{background:linear-gradient(180deg,#5ee58f,#2fbf68);color:#06311a;box-shadow:0 4px 14px rgba(61,220,122,.3);font-size:16px;white-space:nowrap}
+.sub{font-size:13px;font-weight:600;color:var(--ink)}
+.hero{position:relative;overflow:hidden;border:2px solid var(--gold);border-radius:22px;padding:0 14px 14px;display:flex;flex-direction:column;gap:10px;background:radial-gradient(120% 90% at 85% 40%,#1f5a38 0%,#12301f 55%,#0e1b15 100%);box-shadow:0 0 22px rgba(242,193,78,.28)}
+.hero .rib{align-self:flex-start;background:var(--gold);color:#2a2100;font-weight:800;font-size:15px;letter-spacing:.4px;padding:9px 22px 9px 14px;border-radius:0 0 18px 0;margin-left:-14px}
+.hero .cnt{position:absolute;top:12px;right:14px;font-size:18px}
+.hero .hb{display:flex;align-items:center;gap:12px;min-height:118px}
+.hero .he{flex:0 0 auto}
+.hero .big{font-size:clamp(34px,10vw,46px);font-weight:800;line-height:1;text-shadow:0 2px 10px rgba(0,0,0,.4)}
+.hero .hp{flex:0 0 auto;padding-left:12px;border-left:1px solid #2f6b45}
+.hero .pz{font-family:var(--mono);font-weight:800;font-size:clamp(26px,8vw,36px);color:var(--gold);line-height:1.1}
+.hero .elim{font-size:14px;font-weight:600}
+.fan{position:absolute;right:8px;top:52px;width:36%;height:112px;pointer-events:none}
+.fan img{position:absolute;bottom:0;width:48%;aspect-ratio:5/7;object-fit:cover;border-radius:7px;border:2px solid #d9cba6;box-shadow:0 4px 10px rgba(0,0,0,.5)}
+.fan img:nth-child(1){left:0;transform:rotate(-12deg)}.fan img:nth-child(2){left:26%;z-index:2;width:52%;transform:rotate(2deg)}.fan img:nth-child(3){right:0;transform:rotate(13deg)}
+.prog{position:relative;border:1px solid #2f6b45;border-radius:20px;padding:14px;display:flex;flex-direction:column;gap:12px;background:linear-gradient(160deg,#17402a 0%,#12301f 60%,#0e1b15 100%);box-shadow:0 0 18px rgba(61,220,122,.12)}
+.prog.off{opacity:.85}
+.prog .top{display:flex;align-items:center;gap:12px}
+.cal{flex:0 0 auto;width:56px;border-radius:10px;overflow:hidden;background:#fff;color:#222;text-align:center;box-shadow:0 3px 8px rgba(0,0,0,.4)}
+.cal b{display:block;background:#e0443a;color:#fff;font-size:10px;letter-spacing:.5px;padding:3px 0;text-transform:uppercase}
+.cal span{display:block;font-size:28px;font-weight:800;line-height:1.15;padding:2px 0 4px}
+.prog .tt{flex:1;min-width:0}
+.prog .tt h2{font-size:17px;letter-spacing:.3px}
+.prog .hr{font-size:15px;font-weight:700;margin-top:2px}
+.prog .cn{text-align:right;font-size:18px}
+.prog .mid{display:grid;grid-template-columns:1.3fr 1fr;gap:12px;align-items:center}
+.prog .cd{display:flex;align-items:center;gap:10px;padding-right:10px;border-right:1px solid #2f6b45}
+.prog .cd .hg{font-size:30px;line-height:1}
+.prog .cdn{font-family:var(--mono);font-weight:800;font-size:clamp(20px,6.4vw,28px);color:var(--gold);line-height:1.1;animation:glow 1.8s ease-in-out infinite}
+@keyframes glow{0%,100%{text-shadow:0 0 0 rgba(242,193,78,0)}50%{text-shadow:0 0 14px rgba(242,193,78,.7)}}
+.prog .ep{text-align:center;font-size:13px;line-height:1.5}
+.prog .ep b{font-family:var(--mono);font-size:19px;color:var(--ink)}.prog .ep .gold{font-size:19px}
+.prog .info{font-size:12px;color:var(--mute);text-align:center}
+.liveb{display:flex;align-items:center;justify-content:center;gap:10px;padding:10px;border-radius:16px;border:1px solid #3a3a1c;background:linear-gradient(90deg,transparent,#2b2a14,transparent);font-weight:700;font-size:17px}
+.prb{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;align-items:center;border:1px solid #2f8f58;border-radius:20px;padding:14px;background:linear-gradient(160deg,#16452b 0%,#12301f 70%);box-shadow:0 0 16px rgba(61,220,122,.18)}
+.prb .bot{grid-row:1/3;width:64px;height:64px;border-radius:50%;display:grid;place-items:center;font-size:34px;background:radial-gradient(circle at 35% 30%,#2a6a46,#123022);border:2px solid #3ddc7a}
+.prb h2{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:17px;letter-spacing:.3px}
+.prb .gt{background:#3ddc7a;color:#06311a;font-size:12px;font-weight:800;padding:3px 10px;border-radius:999px}
+.prb .tx{font-size:13px;color:var(--ink)}.prb .tx small{display:block;color:var(--mute);font-size:12px;margin-top:2px}
+.prb .cta{grid-column:1/3}
+@media (prefers-reduced-motion:reduce){.prog .cdn{animation:none}}
 </style>
 </head>
 <body>
@@ -487,46 +532,53 @@ function rankHTML(){
   return mio+`<div class="card"><h2>Mejores jugadores</h2><div class="note">Columnas: Jugadas · Ganadas · Perdidas · % de victorias. Las partidas gratis no suman.</div>${t.length?t.slice(0,30).map(fila).join(''):'<p class="note">Todavía no hay partidas registradas.</p>'}</div>`;
 }
 function pruebaHTML(){
-  return cfg.prueba?`<div class="card"><h2>🤖 Mesa de prueba</h2><p class="note">Jugá una partida de práctica contra un bot. Es gratis y no cuenta para el ranking.</p><button class="b2" data-a="bot" ${busy?'disabled':''}>Jugar contra el bot</button></div>`:'';
+  return cfg.prueba?`<div class="prb"><div class="bot" aria-hidden="true">🤖</div>
+    <div><h2>MESA DE PRUEBA <span class="gt">GRATIS</span></h2><div class="tx">Practicá antes de competir.<small>Gratis contra el bot. Sin saldo y sin afectar tu ranking.</small></div></div>
+    <button class="cta gr" data-a="bot" ${busy?'disabled':''}>PRACTICAR GRATIS ›</button></div>`:'';
 }
-function mesasHTML(){return mesasFijasHTML()+pruebaHTML()}
+function mesasHTML(){
+  return `<div class="ttl">¡Elegí tu mesa y jugá!</div><div style="text-align:center"><span class="pill"><i class="dot"></i>Salas disponibles las 24 hs</span></div>`+mesasFijasHTML()+pruebaHTML();
+}
 function mesasFijasHTML(){
   const m=mesas.find(x=>x.id==='mesa-4'&&x.estado==='esperando'&&x.fija);
   const jug=mesas.filter(x=>x.estado==='jugando').length;
-  return principalHTML(m)+progHTML()+(jug?`<p class="note" style="text-align:center">${jug} partida${jug===1?'':'s'} en juego ahora</p>`:'');
+  return principalHTML(m)+progHTML()+(jug?`<div class="liveb">🔥 <span><b class="gold">${jug}</b> partida${jug===1?'':'s'} en juego ahora</span></div>`:'');
 }
 function principalHTML(m){
   if(!m)return `<div class="card"><h2>Mesa principal</h2><p class="note">${me.admin?'Todavía no está creada. Creala desde el Panel de administrador.':'La mesa todavía no está disponible. Probá en unos minutos.'}</p></div>`;
   const llena=m.uids.length>=m.max,falta=me.saldo<m.entrada,blq=bloqueaPrincipal();
-  return `<div class="card"><div class="row"><h2>${esc(m.nombre||'Mesa principal')}</h2><span class="mono gold">${m.uids.length}/${m.max}</span></div>
-    <div class="row"><span class="note">Se elimina a los ${m.limite} puntos</span></div>
-    <div class="row"><span class="note">Entrada</span><span class="mono">${ent(m.entrada)}</span></div>
-    <div class="row"><span class="note">Pozo</span><span class="mono gold">${fmt(neto(m.pozo))}</span></div>
-    <p class="note">Empieza sola 20 segundos después de que se sienta el segundo jugador. Si entra otro, la cuenta vuelve a empezar.</p>
+  const fan=`<div class="fan" aria-hidden="true">${['copa-10','copa-12','copa-11'].map(c=>`<img src="cartas/${c}.jpg" alt="" onerror="this.onerror=null;this.src='cartas/dorso.jpg'">`).join('')}</div>`;
+  return `<div class="hero"><div class="rib">★ ${esc((m.nombre||'Mesa principal').toUpperCase())}</div><span class="cnt mono">👥 ${m.uids.length}/${m.max}</span>
+    <div class="hb"><div class="he"><div class="big">${ent(m.entrada)}</div><div class="sub">Entrada por jugador</div></div>
+      <div class="hp"><div class="sub">Pozo:</div><div class="pz">${fmt(neto(m.pozo))}</div></div>${fan}</div>
+    <div class="elim">🏆 Eliminación: <b class="gold">${m.limite}</b> puntos</div>
     ${m.jugadores.length?`<div class="note">Sentados: ${m.jugadores.map(j=>esc(j.name)).join(', ')}</div>`:''}
+    <p class="note">Empieza sola 20 segundos después de que se sienta el segundo jugador. Si entra otro, la cuenta vuelve a empezar.</p>
     ${blq?'<div class="err">Estás suscripto a la partida programada y está por empezar: no podés sentarte en esta mesa ahora. Si querés jugar acá, cancelá la suscripción en la tarjeta de la partida programada.</div>':''}
-    <button class="b1" data-a="unirse" data-id="${m.id}" ${busy||llena||falta||blq?'disabled':''}>${falta?'Saldo insuficiente':llena?'Mesa llena':'Jugar'}</button></div>`;
+    <button class="cta" data-a="unirse" data-id="${m.id}" ${busy||llena||falta||blq?'disabled':''}>${falta?'Saldo insuficiente':llena?'Mesa llena':'JUGAR AHORA ›'}</button></div>`;
 }
 function progHTML(){
   const p=progMesa();
-  if(!p||!p.inicio)return `<div class="card"><h2>📅 Partida programada</h2><p class="note">Por ahora no hay ninguna partida programada. Cuando el administrador programe una, te vas a poder suscribir desde acá.</p></div>`;
+  if(!p||!p.inicio)return `<div class="prog off"><div class="top"><div class="cal"><b>Próx.</b><span>📅</span></div><div class="tt"><h2>PARTIDA PROGRAMADA</h2><div class="info" style="text-align:left;margin-top:4px">Por ahora no hay ninguna partida programada. Cuando el administrador programe una, te vas a poder suscribir desde acá.</div></div></div></div>`;
   const ya=p.uids.includes(U.uid),llena=p.uids.length>=p.max,falta=me.saldo<p.entrada,cerr=p.inicio.toMillis()<=Date.now()&&p.uids.length>=2;
-  const cuando=p.inicio.toDate().toLocaleString('es-AR',{weekday:'long',day:'2-digit',month:'long',hour:'2-digit',minute:'2-digit'});
-  const lbl=ya?'Estás suscripto ✔':cerr?'Inscripción cerrada':llena?'Cupo completo':falta?'Saldo insuficiente':'Suscribirme';
-  return `<div class="card"><div class="row"><h2>📅 Partida programada</h2><span class="mono gold">${p.uids.length}/${p.max}</span></div>
-    <div class="row"><span class="note">Empieza</span><b style="text-align:right">${esc(cuando)}</b></div>
-    <div class="row"><span class="note">Falta</span><span id="cdp" class="mono gold"></span></div>
-    <div class="row"><span class="note">Se elimina a los ${p.limite} puntos · Entrada</span><span class="mono">${ent(p.entrada)}</span></div>
-    <div class="row"><span class="note">Pozo</span><span class="mono gold">${fmt(neto(p.pozo))}</span></div>
-    ${p.jugadores.length?`<div class="note">Suscriptos: ${p.jugadores.map(j=>esc(j.name)).join(', ')}</div>`:''}
-    <p class="note">Al suscribirte se te descuenta la entrada. Podés cancelar la suscripción (te devolvemos la entrada) y jugar en otra mesa, siempre que la partida no esté por arrancar. Se juega con 2 o más suscriptos.</p>
-    <button class="b1" data-a="unirse" data-id="${p.id}" ${busy||ya||llena||falta||cerr?'disabled':''}>${lbl}</button>
-    ${ya&&!cerr?`<button class="b2" data-a="salirMesa" data-id="${p.id}" ${busy?'disabled':''}>Cancelar suscripción (te devolvemos la entrada)</button>`:''}</div>`;
+  const d=p.inicio.toDate();
+  const dia=d.toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long'}),hora=d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+  const mes=d.toLocaleDateString('es-AR',{month:'short'}).replace('.','');
+  const lbl=ya?'Estás suscripto ✔':cerr?'Inscripción cerrada':llena?'Cupo completo':falta?'Saldo insuficiente':'UNIRME A LA PARTIDA';
+  return `<div class="prog"><div class="top"><div class="cal" aria-hidden="true"><b>${esc(mes)}</b><span>${d.getDate()}</span></div>
+      <div class="tt"><h2>PARTIDA PROGRAMADA</h2><div class="hr">🕒 ${esc(hora)} hs <span class="note">· ${esc(dia)}</span></div></div>
+      <div class="cn mono gold">👥 ${p.uids.length}/${p.max}</div></div>
+    <div class="mid"><div class="cd"><span class="hg" aria-hidden="true">⏳</span><div><div class="sub">Comienza en</div><div id="cdp" class="cdn"></div></div></div>
+      <div class="ep">Entrada: <b>${ent(p.entrada)}</b><br>Pozo: <span class="mono gold">${fmt(neto(p.pozo))}</span></div></div>
+    <div class="info">Se elimina a los ${p.limite} puntos${p.jugadores.length?' · Suscriptos: '+p.jugadores.map(j=>esc(j.name)).join(', '):''}</div>
+    <button class="cta" data-a="unirse" data-id="${p.id}" ${busy||ya||llena||falta||cerr?'disabled':''}>${lbl}</button>
+    ${ya&&!cerr?`<button class="b2" data-a="salirMesa" data-id="${p.id}" ${busy?'disabled':''}>Cancelar suscripción (te devolvemos la entrada)</button>`:''}
+    <div class="info">ⓘ Se juega con 2 o más participantes. Podés cancelar antes del inicio y te devolvemos la entrada.</div></div>`;
 }
 function lobbyView(){
   const wa=cfg.whatsapp?`<a class="b1" target="_blank" rel="noopener" href="https://wa.me/${cfg.whatsapp}?text=${encodeURIComponent('Hola, quiero cargar fichas. Mi usuario: '+me.name+' (código '+U.uid.slice(0,6)+')')}">Cargar saldo por WhatsApp</a>`:'';
   const tabs=`<div class="tabs"><button class="${vista==='rank'?'':'on'}" data-a="vista" data-v="mesas">Mesas</button><button class="${vista==='rank'?'on':''}" data-a="vista" data-v="rank">🏆 Ranking</button></div>`;
-  return `<img class="logo" src="logo.png" alt="Chinchón Online">${head()}${wa}${me.admin?'<a class="b2" style="text-align:center;text-decoration:none;border-radius:14px;padding:13px;font-weight:800" href="admin.html">Panel de administrador</a>':''}
+  return `<img class="logo g" src="logo.png" alt="Chinchón Online">${head()}${wa}${me.admin?'<a class="b2" style="text-align:center;text-decoration:none;border-radius:14px;padding:13px;font-weight:800" href="admin.html">Panel de administrador</a>':''}
   ${me.saldo<Math.min(...cfg.entradas)?`<div class="card"><b>Tu saldo es ${fmt(me.saldo)}</b><p class="note">Para jugar tenés que cargar saldo. Usá el botón Cargar saldo por WhatsApp.</p></div>`:''}
   ${err?`<div class="err">${err}</div>`:''}${tabs}${vista==='rank'?rankHTML():mesasHTML()}`;
 }
