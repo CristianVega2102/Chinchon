@@ -135,7 +135,9 @@ const SON={
   corte:[[392,0,.12,'triangle'],[392,.16,.12,'triangle'],[262,.34,.3,'triangle']],
   gano:[[523,0,.14],[659,.14,.14],[784,.28,.14],[1047,.42,.55]],
   perdio:[[392,0,.2,'triangle'],[330,.2,.2,'triangle'],[262,.4,.45,'triangle']],
-  turno:[[880,0,.12],[1175,.14,.28]]
+  turno:[[880,0,.12],[1175,.14,.28]],
+  alerta:[[880,0,.16,'square'],[880,.26,.16,'square'],[880,.52,.16,'square'],[1175,.78,.45,'square']],
+  tick:[[1000,0,.09]]
 };
 function sonar(n,extra=0){
   if(!sonido||!SON[n]||!ctxA||ctxA.state!=='running')return;const c=ctxA;
@@ -143,6 +145,7 @@ function sonar(n,extra=0){
     o.type=tp||'sine';o.frequency.value=f;g.gain.setValueAtTime(0.0001,t0);g.gain.linearRampToValueAtTime(.2,t0+.02);g.gain.exponentialRampToValueAtTime(.001,t0+d);
     o.connect(g);g.connect(c.destination);o.start(t0);o.stop(t0+d+.05)});
 }
+const vibrar=p=>{if(sonido&&navigator.vibrate)try{navigator.vibrate(p||[250,120,250,120,250])}catch(e){}};
 
 let prevS=null;
 function detectarSonidos(){
@@ -222,7 +225,7 @@ function vencioListo(g){
   g.res=g.res||{cerro:'',chin:false,filas:[]};
   if(lis.length<=1){g.ganador=lis[0];g.pagado=false;g.res.motivo='tiempo';g.res.quien=tarde}else repartir(g);
 }
-function armarG(d){const g={orden:d.uids.slice(),nombres:Object.fromEntries(d.jugadores.map(j=>[j.uid,j.name])),puntos:Object.fromEntries(d.uids.map(x=>[x,0])),fuera:{},limite:d.limite||100,seg:cfg.turno||20,esp:cfg.espera||ESPERA,segReeng:cfg.segReeng||20,dealer:d.max-1,ganador:'',pagado:false};repartir(g);return g}
+function armarG(d){const g={vivo:Object.fromEntries(d.uids.map(x=>[x,Date.now()])),orden:d.uids.slice(),nombres:Object.fromEntries(d.jugadores.map(j=>[j.uid,j.name])),puntos:Object.fromEntries(d.uids.map(x=>[x,0])),fuera:{},limite:d.limite||100,seg:cfg.turno||20,esp:cfg.espera||ESPERA,segReeng:cfg.segReeng||20,dealer:d.max-1,ganador:'',pagado:false};repartir(g);return g}
 function autoJugar(g){
   const u=g.orden[g.turno];let h=g.manos[u];
   if(g.fase==='robar'){if(!g.mazo.length){const t=g.desc.pop();g.mazo=shuf(g.desc);g.desc=[t]}h=ord([...h,g.mazo.pop()])}
@@ -234,7 +237,7 @@ function autoJugar(g){
 /* ---------- Jugadas en línea ---------- */
 async function mover(fn){
   const ref=doc(db,'mesas',mia.id);
-  await runTransaction(db,async t=>{const s=await t.get(ref);const d=s.data(),g=d.g;const x=fn(g,d,t);if(d.prueba&&g.ganador&&!g.pagado)g.pagado=true;if(g.ganador&&!g.finAt)g.finAt=Date.now();t.update(ref,{g,...(x||{})})});
+  await runTransaction(db,async t=>{const s=await t.get(ref);const d=s.data(),g=d.g;if(vivoUid){g.vivo=g.vivo||{};g.vivo[vivoUid]=Date.now()}const x=fn(g,d,t);if(d.prueba&&g.ganador&&!g.pagado)g.pagado=true;if(g.ganador&&!g.finAt)g.finAt=Date.now();t.update(ref,{g,...(x||{})})});
 }
 /* Estadísticas del ranking: se anotan una sola vez por partida, aparte de la jugada (si falla, la partida sigue igual) */
 const regT={};
@@ -251,7 +254,7 @@ async function registrarStats(id){
     });
   }catch(e){}
 }
-const CUENTA=20;
+const CUENTA=20,CUENTA_PROG=15;
 const REV_VENTANA=120,REV_ESPERA=60;
 const cuenta=m=>{const t=m.cuentaIni&&m.cuentaIni.toMillis?m.cuentaIni.toMillis():0;if(!t)return 999;const seg=CUENTA;return Math.ceil((t+seg*1000-Date.now())/1000)};
 setInterval(()=>{
@@ -284,6 +287,8 @@ async function registrarLog(id){
 }
 /* ---------- Revancha de la partida programada ---------- */
 const tms=x=>x&&x.toMillis?x.toMillis():0;
+/* La partida programada arranca en la hora fijada, pero nunca antes de 15 s después de la última inscripción */
+const progInicio=m=>Math.max(tms(m.inicio),tms(m.cuentaIni)+CUENTA_PROG*1000);
 setInterval(()=>{
   const el=document.getElementById('cdrev');if(!el||!mia)return;
   const p=progMesa(),ini=p?tms(p.inicio):0,f=ini||((mia.g&&mia.g.finAt||0)+REV_VENTANA*1000),r=Math.ceil((f-Date.now())/1000);
@@ -326,7 +331,7 @@ async function iniciarProg(){
   if(iniP)return;iniP=true;
   try{const ref=doc(db,'mesas','mesa-prog');
     await runTransaction(db,async t=>{const d=(await t.get(ref)).data();
-      if(!d||d.estado!=='esperando'||!d.prog||!d.inicio||d.uids.length<2||d.inicio.toMillis()>Date.now())return;
+      if(!d||d.estado!=='esperando'||!d.prog||!d.inicio||d.uids.length<2||progInicio(d)+1000>Date.now())return;
       const nref=doc(collection(db,'mesas'));
       const {cuentaIni,ultima,...resto}=d;
       t.set(nref,{...resto,fija:false,origen:'mesa-prog',estado:'jugando',g:armarG(d),iniciada:serverTimestamp()});
@@ -338,8 +343,8 @@ async function iniciarProg(){
 setInterval(()=>{
   if(!U||!me)return;const p=progMesa();if(!p||!p.inicio)return;
   const el=document.getElementById('cdp');
-  if(el){const r=Math.ceil((p.inicio.toMillis()-Date.now())/1000);el.textContent=r>0?dur(r):(p.uids.length>=2?'Empezando…':'Esperando más jugadores')}
-  if(mia||busy||!p.uids.includes(U.uid)||p.uids.length<2||p.inicio.toMillis()>Date.now())return;
+  if(el){const r=Math.ceil((progInicio(p)-Date.now())/1000);el.textContent=r>0?dur(r):(p.uids.length>=2?'Empezando…':'Esperando más jugadores')}
+  if(mia||busy||!p.uids.includes(U.uid)||p.uids.length<2||progInicio(p)+1000>Date.now())return;
   iniciarProg();
 },1000);
 let iniciando=null;
@@ -412,12 +417,95 @@ setInterval(()=>{
     if(Date.now()-(tmo[k]||0)>6000){tmo[k]=Date.now();const ve=g.vence;
       mover(g2=>{if(g2.vence!==ve||g2.fase==='resumen')return;autoJugar(g2)}).catch(()=>{})}}
 },1000);
+/* ---------- Alertas de sonido cuando una partida está por empezar ---------- */
+const avis={};
+setInterval(()=>{
+  if(!U||!me)return;const now=Date.now(),p=progMesa();
+  if(p&&p.inicio&&p.uids.includes(U.uid)){
+    const ini=progInicio(p),r=Math.ceil((ini-now)/1000);
+    if(r>0&&r<=60){const k='p'+ini;if(!avis[k]){avis[k]=1;sonar('alerta');vibrar()}}
+    if(r>0&&r<=5&&p.uids.length>=2){const k='pt'+ini+'|'+r;if(!avis[k]){avis[k]=1;sonar('tick')}}
+  }
+  if(mia&&mia.estado==='esperando'&&mia.uids.length>=2){
+    const r=cuenta(mia),t=tms(mia.cuentaIni);
+    if(r>0&&r<=CUENTA){const k='m'+mia.id+'|'+t;if(!avis[k]){avis[k]=1;sonar('alerta');vibrar()}}
+    if(r>0&&r<=5){const k='mt'+mia.id+'|'+t+'|'+r;if(!avis[k]){avis[k]=1;sonar('tick')}}
+  }
+},500);
+
+/* ---------- Inactividad: a los 120 s sin jugar se avisa; si no contesta en 30 s, se lo saca ---------- */
+const INACT=120,RESP=30;
+let lastTouch=Date.now(),askAt=0,vivoUid=null;const avisado=new Set();
+['pointerdown','keydown','touchstart'].forEach(ev=>document.addEventListener(ev,()=>{lastTouch=Date.now()},{passive:true}));
+function quitarInactivo(g,u){
+  if(g.ganador||g.fuera[u])return;
+  g.fuera[u]=true;g.manos[u]=[];g.inact=g.inact||{};g.inact[u]=true;
+  const act=g.orden.filter(x=>!g.fuera[x]);
+  g.res=g.res||{cerro:'',chin:false,filas:[]};
+  if(act.length<=1){g.ganador=act[0];g.pagado=false;g.fase='resumen';g.res.motivo='inactividad';g.res.quien=[u];return}
+  if(g.fase==='resumen'){if(todosListos(g))repartir(g);return}
+  if(g.orden[g.turno]===u){g.turno=sig(g,g.turno);g.fase='robar';g.nuevo=-1;g.vence=Date.now()+(g.seg||20)*1000}
+}
+function modalInact(seg){
+  let el=document.getElementById('inact');
+  if(seg===null){if(el)el.remove();return}
+  if(!el){
+    el=document.createElement('div');el.id='inact';
+    el.style.cssText='position:fixed;inset:0;z-index:99;background:rgba(5,12,9,.88);display:flex;align-items:center;justify-content:center;padding:20px';
+    el.innerHTML='<div style="background:#12301f;border:1px solid #2f6b45;border-radius:20px;padding:22px;max-width:340px;width:100%;text-align:center;display:flex;flex-direction:column;gap:12px"><div style="font-size:40px">⏰</div><h2 style="margin:0">¿Seguís ahí?</h2><p id="inactTxt" style="margin:0"></p><button id="inactOk" class="b1">Sigo acá</button></div>';
+    document.body.appendChild(el);
+    document.getElementById('inactOk').onclick=respondeInact;
+  }
+  document.getElementById('inactTxt').textContent='Hace 2 minutos que no jugás. Si no respondés en '+seg+' s te sacamos de la partida.';
+}
+function respondeInact(){
+  lastTouch=Date.now();askAt=0;modalInact(null);
+  if(mia&&mia.estado==='jugando'&&mia.g&&!mia.prueba){vivoUid=U.uid;mover(()=>{}).catch(()=>{}).finally(()=>{vivoUid=null})}
+}
+async function salirInactivo(m){
+  const j=m.jugadores.find(x=>x.uid===U.uid);if(busy||!j)return;busy=true;
+  try{
+    const b=writeBatch(db);
+    b.update(doc(db,'mesas',m.id),{uids:arrayRemove(U.uid),jugadores:arrayRemove(j),pozo:increment(-m.entrada),listos:[],cuentaIni:serverTimestamp()});
+    if(m.entrada>0)b.update(doc(db,'users',U.uid),{saldo:increment(m.entrada),mesaSalida:m.id});
+    await b.commit();busy=false;err='Te sacamos de la mesa por estar 2 minutos sin actividad. Te devolvimos la entrada.';view();
+  }catch(x){fail(x)}
+}
+setInterval(()=>{
+  if(!U||!me||!mia){askAt=0;modalInact(null);return}
+  const now=Date.now(),u=U.uid;let idle=0,activo=false,vu=0;
+  if(mia.estado==='jugando'&&mia.g&&!mia.prueba){
+    const g=mia.g;
+    if(g.inact&&g.inact[u]&&!avisado.has(mia.id)){
+      avisado.add(mia.id);askAt=0;modalInact(null);dejar(mia.id);err='Te sacamos de la partida por estar 2 minutos sin jugar.';view();return}
+    if(!g.ganador&&g.vivo){
+      if(!g.fuera[u]&&g.vivo[u]){activo=true;vu=g.vivo[u];idle=(now-vu)/1000}
+      /* respaldo: si alguien no responde y su celular no lo saca, lo saca otro jugador de la mesa */
+      g.orden.forEach(x=>{
+        if(x===u||x==='bot'||g.fuera[x]||!g.vivo[x]||(now-g.vivo[x])/1000<INACT+RESP+5)return;
+        const k=mia.id+'|i|'+x+'|'+g.vivo[x];if(now-(tmo[k]||0)<10000)return;tmo[k]=now;const vx=g.vivo[x];
+        mover(g2=>{if(g2.ganador||g2.fuera[x]||!g2.vivo||g2.vivo[x]!==vx)return;quitarInactivo(g2,x)}).catch(()=>{});
+      });
+    }
+  }else if(mia.estado==='esperando'&&mia.uids.length<2){activo=true;idle=(now-lastTouch)/1000}
+  if(!activo){askAt=0;modalInact(null);return}
+  if(idle<INACT){if(askAt){askAt=0;modalInact(null)}return}
+  if(!askAt){askAt=now;sonar('alerta');vibrar()}
+  const left=Math.max(0,RESP-Math.floor((now-askAt)/1000));
+  modalInact(left);
+  if(left>0)return;
+  askAt=0;modalInact(null);
+  if(mia.estado==='esperando')salirInactivo(mia);
+  else{const k=mia.id+'|s|'+vu;if(now-(tmo[k]||0)<10000)return;tmo[k]=now;
+    mover(g2=>{if(g2.ganador||g2.fuera[u]||!g2.vivo||g2.vivo[u]!==vu)return;quitarInactivo(g2,u)}).catch(()=>{})}
+},1000);
 async function juego(a,b){
   if(a==='sel'){sel=+b.dataset.c;return view()}
   if(a==='volver'){if(mia)dejar(mia.id);return}
   if(a==='aband'&&!confirm('Si abandonás, perdés la partida y el pozo. ¿Seguro?'))return;
   busy=true;err='';view();
   const u=U.uid,m=mia,uref=doc(db,'users',u);
+  vivoUid=['robar','tirar','cerrar','sig','reeng','cobrar'].includes(a)?u:null;
   try{
     if(a==='ready')await updateDoc(doc(db,'mesas',m.id),{listos:arrayUnion(u)});
     if(a==='robar')await mover(g=>{if(g.orden[g.turno]!==u||g.fase!=='robar')return;
@@ -443,8 +531,8 @@ async function juego(a,b){
       if(g.orden[g.turno]===u){g.turno=sig(g,g.turno);g.fase='robar';g.nuevo=-1;g.vence=Date.now()+(g.seg||20)*1000}
     });
     if(a==='fin')await updateDoc(doc(db,'mesas',m.id),{estado:'terminada'});
-    sel=null;busy=false;view();
-  }catch(x){fail(x)}
+    sel=null;busy=false;vivoUid=null;view();
+  }catch(x){vivoUid=null;fail(x)}
 }
 const PALO=['oro','copa','espada','basto'];
 const gcard=(n,x='',at='')=>{const c=dc(n);const u=c.j?'cartas/comodin.jpg':`cartas/${PALO[c.s]}-${c.r}.jpg`;return `<div class="gc img ${c.j?'':'s'+c.s} ${x}" style="background-image:url(${u})" ${at}></div>`};
@@ -473,7 +561,7 @@ function juegoView(){
     const filas=R.filas.map(f=>`<div class="card" style="padding:10px"><div class="row"><b>${nom(f.uid)}${g.fuera[f.uid]?' · eliminado':''}</b><span class="mono" style="color:${f.add>0?'var(--bad)':'var(--ok)'}">${f.add>0?'+':''}${f.add} → ${f.total}</span></div>${(()=>{const d=desglose(f.mano);return `<div class="mcs">${d.grupos.map(gr=>`<span class="grp">${gr.map(mini).join('')}</span>`).join('')}</div>`+(d.sueltas.length?`<div class="mcs"><span class="note">Suman ${d.pts}:</span>${d.sueltas.map(mini).join('')}</div>`:'<div class="note">Todas combinadas</div>')})()}</div>`).join('');
     let bt='';
     if(gan){const prize=neto(m.pozo);
-      bt=`<h2>${R.chin?'¡CHINCHÓN! ':''}Ganó ${nom(gan)}</h2>`+(R.motivo?`<p class="note">${(R.quien||[]).map(nom).join(', ')} ${R.motivo==='tiempo'?'no tocó Listo a tiempo':'abandonó la partida'}.</p>`:'')+(g.pagado?`<button class="b1" data-a="fin">Volver al lobby</button>`:gan===u?`<button class="b1" data-a="cobrar" ${busy?'disabled':''}>Cobrar ${fmt(prize)}</button>`:`<button class="b1" data-a="volver">Volver al lobby</button>`)+revanchaHTML(m,g,u);
+      bt=`<h2>${R.chin?'¡CHINCHÓN! ':''}Ganó ${nom(gan)}</h2>`+(R.motivo?`<p class="note">${(R.quien||[]).map(nom).join(', ')} ${R.motivo==='tiempo'?'no tocó Listo a tiempo':R.motivo==='inactividad'?'estuvo inactivo y salió de la partida':'abandonó la partida'}.</p>`:'')+(g.pagado?`<button class="b1" data-a="fin">Volver al lobby</button>`:gan===u?`<button class="b1" data-a="cobrar" ${busy?'disabled':''}>Cobrar ${fmt(prize)}</button>`:`<button class="b1" data-a="volver">Volver al lobby</button>`)+revanchaHTML(m,g,u);
     }else{const vr=g.venceReeng?Math.max(0,Math.ceil((g.venceReeng-Date.now())/1000)):0;
       const ven=vr>0?`<p class="note">${fuera?'Tenés':'Esperando un posible reenganche:'} <b id="cdre" class="mono gold">${vr}s</b>${fuera?' para reengancharte.':''}</p>`:'';
       bt=`<h2>${nom(R.cerro)} cerró la mano</h2>`+ven+(fuera?`<button class="b2" data-a="reeng" ${busy||me.saldo<(m.reeng||m.entrada)?'disabled':''}>Reengancharse ${(m.reeng||m.entrada)?'por '+fmt(m.reeng||m.entrada):'gratis'}</button>`:'')+(fuera?'':`<p class="note">Tenés <b id="cdr" class="mono gold">${Math.max(0,Math.ceil((g.venceR-Date.now())/1000))}s</b> para tocar Listo, o perdés la partida.</p>`)+`<button class="b1" data-a="sig" ${busy||fuera||(g.listosR||{})[u]?'disabled':''}>${(g.listosR||{})[u]?'Esperando a los demás':'Listo para la siguiente mano'} (${Object.keys(g.listosR||{}).length}/${g.orden.filter(x=>!g.fuera[x]).length})</button>`;}
